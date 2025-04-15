@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard } from 'lucide-react';
+import { Plus, ArrowUpRight, ArrowDownLeft, CreditCard, Pencil, Trash2 } from 'lucide-react';
 import { Wallet, WalletTransaction } from '@/types';
 
 interface WalletIndexProps {
@@ -22,6 +22,19 @@ export default function WalletIndex({ wallets }: WalletIndexProps) {
 
   const handleWithdraw = (id: string) => {
     router.visit(route('funding.withdrawal.create', { wallet_id: id }));
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this wallet? This action cannot be undone.')) {
+      router.delete(route('wallets.destroy', id), {
+        preserveScroll: true,
+        onSuccess: () => console.log('Wallet deleted'),
+        onError: (errors) => {
+          console.error('Error deleting wallet:', errors);
+          alert('Error deleting wallet. Check console for details.');
+        },
+      });
+    }
   };
 
   return (
@@ -53,7 +66,7 @@ export default function WalletIndex({ wallets }: WalletIndexProps) {
             <TabsContent value="wallets" className="mt-6">
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {wallets.map((wallet) => (
-                  <Card key={wallet.id} className="bg-white dark:bg-gray-800">
+                  <Card key={wallet.id} className="bg-white dark:bg-gray-800 flex flex-col">
                     <CardHeader className="pb-2">
                       <div className="flex justify-between">
                         <CardDescription>
@@ -70,7 +83,7 @@ export default function WalletIndex({ wallets }: WalletIndexProps) {
                         {formatCurrency(wallet.balance)}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex-grow">
                       <div className="text-sm text-muted-foreground">
                         <div className="flex justify-between py-1">
                           <span>Available:</span>
@@ -86,31 +99,37 @@ export default function WalletIndex({ wallets }: WalletIndexProps) {
                         </div>
                       </div>
                     </CardContent>
-                    <CardFooter className="flex justify-between gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full"
-                        onClick={() => router.visit(route('wallets.show', wallet.id))}
-                      >
-                        Details
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full"
-                        onClick={() => handleDeposit(wallet.id)}
-                      >
-                        <ArrowDownLeft className="mr-1 h-3 w-3" /> Deposit
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="w-full"
-                        onClick={() => handleWithdraw(wallet.id)}
-                      >
-                        <ArrowUpRight className="mr-1 h-3 w-3" /> Withdraw
-                      </Button>
+                    <CardFooter className="pt-4 flex justify-between items-center border-t border-gray-200 dark:border-gray-700 mt-auto">
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleDeposit(wallet.id)}>
+                          <ArrowDownLeft className="mr-1 h-4 w-4 text-green-500" /> Deposit
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleWithdraw(wallet.id)}>
+                          <ArrowUpRight className="mr-1 h-4 w-4 text-red-500" /> Withdraw
+                        </Button>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                          onClick={() => router.visit(route('wallets.edit', wallet.id))}
+                          aria-label={`Edit wallet ${wallet.currency}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                          onClick={() => handleDelete(wallet.id)}
+                          aria-label={`Delete wallet ${wallet.currency}`}
+                          disabled={wallet.balance > 0}
+                          title={wallet.balance > 0 ? "Cannot delete wallet with balance" : "Delete wallet"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </CardFooter>
                   </Card>
                 ))}
@@ -127,10 +146,10 @@ export default function WalletIndex({ wallets }: WalletIndexProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {wallets.flatMap(wallet => 
+                    {wallets.flatMap(wallet =>
                       wallet.transactions?.slice(0, 3).map((transaction: WalletTransaction) => (
-                        <div 
-                          key={transaction.id} 
+                        <div
+                          key={transaction.id}
                           className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
                         >
                           <div className="flex items-start sm:items-center gap-3 mb-2 sm:mb-0">
@@ -175,16 +194,16 @@ export default function WalletIndex({ wallets }: WalletIndexProps) {
                       )) || []
                     )}
                   </div>
-                  
+
                   {wallets.every(wallet => !wallet.transactions || wallet.transactions.length === 0) && (
                     <div className="text-center py-8 text-muted-foreground">
                       No transactions found
                     </div>
                   )}
-                  
+
                   <div className="mt-6 text-center">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       onClick={() => router.visit(route('funding.index'))}
                     >
                       View All Transactions

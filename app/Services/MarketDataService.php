@@ -210,7 +210,7 @@ class MarketDataService
             return ($entryPrice - $currentPrice) * $quantity;
         }
     }
-    
+
     /**
      * Get historical price data for a currency pair.
      *
@@ -324,11 +324,16 @@ class MarketDataService
         }
         
         // Generate predictive data using the German Sniper EA algorithm
-        $predictiveData = $this->generatePredictiveData($historicalData, $currencyPair, $timeframe);
+        // $predictiveData = $this->generatePredictiveData($historicalData, $currencyPair, $timeframe); // Temporarily disabled due to incomplete function
+        
+        // Return empty predictive data with the same structure as historical data
+        $predictiveData = [
+            'data' => [] // Empty array but with the expected structure
+        ];
         
         return [
             'historical' => $historicalData,
-            'predictive' => $predictiveData
+            'predictive' => $predictiveData // Return structured empty predictive data
         ];
     }
     

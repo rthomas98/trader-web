@@ -33,13 +33,31 @@ class FundingController extends Controller
     /**
      * Display a listing of funding transactions.
      */
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
-        $transactions = $this->fundingService->getTransactionHistory($user);
+        
+        $limit = $request->input('limit', 15); // Default limit to 15
+        $page = $request->input('page', 1);
+        $offset = ($page - 1) * $limit;
+        
+        // Pass limit and offset to the service method
+        $transactions = $this->fundingService->getTransactionHistory($user, $limit, $offset);
+        
+        // Fetch user's wallets
+        $wallets = $user->wallets()->get();
+        
+        // Fetch user's active connected accounts (assuming balance is available)
+        // Note: Fetching real-time balances might require a service call
+        $connectedAccounts = $user->connectedAccounts()
+            ->where('status', 'ACTIVE')
+            // ->with('balance') // Assuming a balance relationship or attribute exists
+            ->get();
             
         return Inertia::render('funding/index', [
             'transactions' => $transactions,
+            'wallets' => $wallets, 
+            'connectedAccounts' => $connectedAccounts,
         ]);
     }
     
@@ -188,7 +206,7 @@ class FundingController extends Controller
     {
         $user = Auth::user();
         $transaction = $user->fundingTransactions()
-            ->with('connectedAccount')
+            ->with(['connectedAccount', 'wallet']) // Eager load both relationships
             ->findOrFail($id);
             
         return Inertia::render('funding/show', [

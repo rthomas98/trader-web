@@ -69,6 +69,17 @@ export default function FundingShow({ transaction }: FundingShowProps) {
     router.post(route('funding.retry', transaction.id));
   };
 
+  const handleProcess = () => {
+    if (confirm('Are you sure you want to process this transaction? This will complete the transaction immediately.')) {
+      router.post(route('funding.process', transaction.id), {}, {
+        onSuccess: () => {
+          // Refresh the page after successful processing
+          router.reload();
+        }
+      });
+    }
+  };
+
   return (
     <AppLayout>
       <Head title={`${isDeposit ? 'Deposit' : 'Withdrawal'} Details`} />
@@ -164,14 +175,14 @@ export default function FundingShow({ transaction }: FundingShowProps) {
                       <h3 className="text-sm font-medium text-muted-foreground">
                         {isDeposit ? 'To' : 'From'} Wallet
                       </h3>
-                      <p className="font-medium">{transaction.wallet.currency} Wallet</p>
+                      <p className="font-medium">{transaction.wallet?.currency ?? 'N/A'} Wallet</p>
                       <p className="text-sm">
-                        Balance: {formatCurrency(transaction.wallet.balance)}
+                        Balance: {formatCurrency(transaction.wallet?.balance ?? 0)}
                       </p>
                       <Button 
                         variant="link" 
                         className="p-0 h-auto text-sm"
-                        onClick={() => router.visit(route('wallets.show', transaction.wallet.id))}
+                        onClick={() => router.visit(route('wallets.show', transaction.wallet?.id))}
                       >
                         View Wallet <ExternalLink className="ml-1 h-3 w-3" />
                       </Button>
@@ -188,13 +199,22 @@ export default function FundingShow({ transaction }: FundingShowProps) {
               </CardContent>
               {transaction.status === 'PENDING' && (
                 <CardFooter>
-                  <Button 
-                    variant="destructive" 
-                    className="w-full"
-                    onClick={handleCancel}
-                  >
-                    Cancel Transaction
-                  </Button>
+                  <div className="flex w-full gap-2">
+                    <Button 
+                      variant="destructive" 
+                      className="w-full"
+                      onClick={handleCancel}
+                    >
+                      Cancel Transaction
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      className="w-full bg-[#8D5EB7] hover:bg-[#7D4EA7]"
+                      onClick={handleProcess}
+                    >
+                      Process Transaction
+                    </Button>
+                  </div>
                 </CardFooter>
               )}
               {transaction.status === 'FAILED' && (
@@ -301,8 +321,8 @@ export default function FundingShow({ transaction }: FundingShowProps) {
                     variant="outline" 
                     className="w-full"
                     onClick={() => router.visit(isDeposit 
-                      ? route('funding.create-deposit') 
-                      : route('funding.create-withdrawal')
+                      ? route('funding.deposit.create') 
+                      : route('funding.withdrawal.create')
                     )}
                   >
                     {isDeposit ? 'Make Another Deposit' : 'Make Another Withdrawal'}

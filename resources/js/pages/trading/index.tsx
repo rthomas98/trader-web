@@ -32,6 +32,7 @@ import {
 import { useAppearance } from '@/hooks/use-appearance';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from "@/components/ui/use-toast";
+import TradingChart from '@/components/trading/trading-chart';
 
 // Define types for our data
 interface Position {
@@ -114,6 +115,12 @@ interface PositionFormData {
   take_profit: number | null;
 }
 
+interface CandleData {
+  x: Date;
+  y: number[]; // [open, high, low, close, volume (optional)]
+  pair?: string;
+}
+
 // Format currency helper function
 const formatCurrency = (value: number | undefined | null): string => {
   const safeValue = value ?? 0;
@@ -147,9 +154,9 @@ const Trading = ({
     stop_loss: null,
     take_profit: null,
   });
-  const [selectedTimeframe, setSelectedTimeframe] = useState('1h');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1h');
   const [selectedPair, setSelectedPair] = useState('EUR/USD');
-  const [predictiveMode, setPredictiveMode] = useState(false);
+  const [predictiveMode, setPredictiveMode] = useState<boolean>(false);
   
   const { appearance } = useAppearance();
   const { toast } = useToast();
@@ -159,7 +166,7 @@ const Trading = ({
     try {
       const response = await axios.get('/trading/chart-data', {
         params: {
-          pair: selectedPair,
+          currency_pair: selectedPair,
           timeframe: selectedTimeframe
         }
       });
@@ -439,6 +446,51 @@ const Trading = ({
     }
   };
 
+  // Helper function (needed by fetchHistoricalData)
+  const getTimeframeInMs = (tf: string): number => {
+    switch (tf) {
+      case '1m': return 1 * 60 * 1000;
+      case '5m': return 5 * 60 * 1000;
+      case '15m': return 15 * 60 * 1000;
+      case '30m': return 30 * 60 * 1000;
+      case '1h': return 60 * 60 * 1000;
+      case '4h': return 4 * 60 * 60 * 1000;
+      case '1d': return 24 * 60 * 60 * 1000;
+      case '1w': return 7 * 24 * 60 * 60 * 1000;
+      default: return 60 * 60 * 1000; // Default to 1 hour
+    }
+  };
+
+  // Define fetchHistoricalData function
+  const fetchHistoricalData = async (pairId: string, timeframe: string, count: number = 200): Promise<CandleData[]> => {
+    console.log(`Fetching data for ${pairId}, timeframe: ${timeframe}, count: ${count}`);
+    // In a real app, fetch data from an API endpoint
+    // For now, generate mock data:
+    const data: CandleData[] = [];
+    let lastClose = 1.10000 + (Math.random() - 0.5) * 0.1; // Start with some variation
+    const timeframeMs = getTimeframeInMs(timeframe); // Use the helper
+    let currentTime = new Date().getTime() - count * timeframeMs;
+
+    for (let i = 0; i < count; i++) {
+      const open = lastClose;
+      const high = open + Math.random() * 0.00100;
+      const low = open - Math.random() * 0.00100;
+      const close = low + Math.random() * (high - low);
+      const volume = Math.random() * 10000 + 5000;
+      data.push({
+        x: new Date(currentTime),
+        y: [open, high, low, close, volume], // Ensure volume is included if needed
+        pair: pairId
+      });
+      lastClose = close;
+      currentTime += timeframeMs;
+    }
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    console.log(`Returning ${data.length} data points.`);
+    return data;
+  };
+
   return (
     <AppLayout>
       <Head title="Trading">
@@ -576,12 +628,12 @@ const Trading = ({
               </div>
             </CardHeader>
             <CardContent>
-              <iframe 
-                id="trading-chart-frame"
-                src={`/trading-chart.html?pair=${encodeURIComponent(selectedPair)}&timeframe=${selectedTimeframe}&theme=${appearance === 'dark' || (appearance === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'}&predictive=${predictiveMode}`}
-                className="w-full h-[500px] border-0 bg-background" 
-                title="Trading Chart"
-              ></iframe>
+            <TradingChart
+    pairId={selectedPair} // Pass selectedPair as pairId
+    timeframe={selectedTimeframe}
+    predictiveMode={predictiveMode} // Pass the predictiveMode state
+    historicalDataFn={fetchHistoricalData} // Pass the defined function
+/>
             </CardContent>
           </Card>
 

@@ -70,7 +70,7 @@ export default function WalletEdit({ wallet }: WalletEditProps) {
                       <SelectValue placeholder="Select currency" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="" disabled>Select currency</SelectItem>
+                      {/* Removed the problematic SelectItem with empty value */}
                       {currencyOptions
                         .filter(option => option.type === wallet.currency_type)
                         .map((option) => (

@@ -43,9 +43,9 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
     Route::post('wallets/{id}/withdraw', [WalletController::class, 'withdraw'])->name('wallets.withdraw');
 
     // Trading routes
+    Route::get('trading/chart-data', [TradingController::class, 'getChartData'])->name('trading.chart-data');
     Route::resource('trading', TradingController::class);
     Route::post('trading/positions/{id}/close', [TradingController::class, 'closePosition'])->name('trading.positions.close');
-    Route::get('trading/chart-data', [TradingController::class, 'getChartData'])->name('trading.chart-data');
     Route::post('trading/toggle-mode', [TradingController::class, 'toggleTradingMode'])->name('trading.toggle-mode');
     Route::post('trading/migrate-data', [TradingController::class, 'migrateExistingData'])->name('trading.migrate-data');
 
