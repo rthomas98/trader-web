@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deposit Debugger</title>
+    <meta name="csrf-token" content="" id="csrf-token">
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #1A161D;
+        }
+        h1 {
+            color: #8D5EB7;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #EECEE6;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #8D5EB7;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #7a4ea0;
+        }
+        pre {
+            background-color: #1A161D;
+            color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: #D04014;
+            margin-top: 5px;
+        }
+        .success {
+            color: #4CAF50;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Deposit Debugger</h1>
+    
+    <div class="card">
+        <h2>Test Deposit</h2>
+        <div class="form-group">
+            <label for="amount">Amount ($)</label>
+            <input type="number" id="amount" value="100" min="1" step="1">
+        </div>
+        <button id="deposit-btn">Process Deposit</button>
+        <div id="deposit-status"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Response</h2>
+        <pre id="response-data">No data yet</pre>
+    </div>
+    
+    <div class="card">
+        <h2>Debug Log</h2>
+        <pre id="debug-log">// Debug logs will appear here</pre>
+    </div>
+
+    <script>
+        // Function to log to the debug console
+        function log(message, data = null) {
+            const logElement = document.getElementById('debug-log');
+            const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+            let logMessage = `[${timestamp}] ${message}`;
+            
+            if (data) {
+                if (typeof data === 'object') {
+                    logMessage += '\n' + JSON.stringify(data, null, 2);
+                } else {
+                    logMessage += ' ' + data;
+                }
+            }
+            
+            logElement.textContent = logElement.textContent + '\n' + logMessage;
+            console.log(message, data);
+        }
+
+        // Function to update status
+        function updateStatus(message, isError = false) {
+            const statusElement = document.getElementById('deposit-status');
+            statusElement.textContent = message;
+            statusElement.className = isError ? 'error' : 'success';
+        }
+
+        // Function to display response data
+        function displayResponse(data) {
+            const responseElement = document.getElementById('response-data');
+            responseElement.textContent = typeof data === 'object' 
+                ? JSON.stringify(data, null, 2) 
+                : data.toString();
+        }
+
+        // Function to get CSRF token
+        async function getCsrfToken() {
+            try {
+                log('Fetching CSRF token...');
+                const response = await fetch('/csrf-token');
+                const data = await response.json();
+                
+                if (data.csrf_token) {
+                    document.getElementById('csrf-token').content = data.csrf_token;
+                    log('CSRF token received', data.csrf_token.substring(0, 10) + '...');
+                    return data.csrf_token;
+                } else {
+                    throw new Error('No CSRF token in response');
+                }
+            } catch (error) {
+                log('Error fetching CSRF token', error.message);
+                updateStatus('Failed to get CSRF token: ' + error.message, true);
+                return '';
+            }
+        }
+
+        // Function to test deposit
+        async function testDeposit() {
+            try {
+                const amount = parseFloat(document.getElementById('amount').value);
+                if (isNaN(amount) || amount <= 0) {
+                    updateStatus('Please enter a valid amount', true);
+                    return;
+                }
+
+                log('Starting deposit test with amount', amount);
+                updateStatus('Processing...');
+                
+                // Get the CSRF token
+                const csrfToken = document.getElementById('csrf-token').content || await getCsrfToken();
+                if (!csrfToken) {
+                    updateStatus('No CSRF token available', true);
+                    return;
+                }
+                
+                // Make the deposit request
+                log('Making deposit request...');
+                const response = await fetch('/funding/deposit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({ amount })
+                });
+                
+                log('Response status', response.status);
+                
+                // Parse the response
+                const data = await response.json();
+                log('Response data received', data);
+                displayResponse(data);
+                
+                if (data.success) {
+                    updateStatus('Deposit successful!');
+                    log('Deposit processed successfully');
+                } else {
+                    updateStatus('Deposit failed: ' + (data.message || 'Unknown error'), true);
+                    log('Deposit failed', data.message);
+                }
+            } catch (error) {
+                log('Error processing deposit', error.message);
+                updateStatus('Error: ' + error.message, true);
+                displayResponse({ error: error.message });
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Deposit debugger initialized');
+            document.getElementById('deposit-btn').addEventListener('click', testDeposit);
+        });
+    </script>
+</body>
+</html>

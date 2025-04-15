@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Onboarding Deposit</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #1A161D;
+        }
+        h1, h2 {
+            color: #8D5EB7;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        pre {
+            background-color: #1A161D;
+            color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+        button {
+            background-color: #8D5EB7;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #7d4ea7;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Onboarding Deposit</h1>
+    
+    <div class="card">
+        <h2>Updated handleDeposit Function</h2>
+        <p>Copy this code and replace the existing handleDeposit function in <code>resources/js/Pages/Onboarding/Index.tsx</code> (around line 119):</p>
+        <pre id="handleDepositCode">const handleDeposit = async (): Promise&lt;void&gt; => {
+  try {
+    setIsLoading(true);
+    setDepositError(null);
+    
+    // Get the CSRF token from the meta tag
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    
+    console.log('Starting deposit process with amount:', depositAmount);
+    
+    // Use the new simplified deposit endpoint
+    const response = await axios.post('/funding/simple-deposit', {
+      amount: parseFloat(depositAmount),
+    }, {
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+    });
+    
+    console.log('Deposit response:', response.data);
+    
+    if (response.data.success) {
+      console.log('Deposit successful!');
+      setDepositSuccess(true);
+      setActiveStep(2);
+    } else {
+      console.error('Deposit failed:', response.data.message);
+      setDepositError(response.data.message || 'Failed to process deposit');
+    }
+  } catch (error) {
+    console.error('Error processing deposit:', error);
+    
+    // Extract error message from the response if available
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        error.message || 
+                        'An unexpected error occurred';
+    
+    console.error('Error details:', errorMessage);
+    
+    // Show the error message to the user
+    setDepositError(errorMessage);
+  } finally {
+    setIsLoading(false);
+  }
+};</pre>
+        <button id="copyButton">Copy to Clipboard</button>
+        <p id="copyStatus"></p>
+    </div>
+    
+    <div class="card">
+        <h2>Instructions</h2>
+        <ol>
+            <li>Click the "Copy to Clipboard" button above</li>
+            <li>Open <code>resources/js/Pages/Onboarding/Index.tsx</code> in your editor</li>
+            <li>Find the existing handleDeposit function (around line 119)</li>
+            <li>Replace it with the copied code</li>
+            <li>Save the file</li>
+        </ol>
+        <p>The key change is using the <code>/funding/simple-deposit</code> endpoint instead of <code>/funding/deposit</code>.</p>
+    </div>
+
+    <script>
+        document.getElementById('copyButton').addEventListener('click', function() {
+            const code = document.getElementById('handleDepositCode');
+            const range = document.createRange();
+            range.selectNode(code);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            
+            const status = document.getElementById('copyStatus');
+            status.textContent = 'Copied to clipboard!';
+            status.className = 'success';
+            
+            this.textContent = 'Copied!';
+            setTimeout(() => {
+                this.textContent = 'Copy to Clipboard';
+                status.textContent = '';
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

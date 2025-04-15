@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Onboarding Deposit</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #1A161D;
+        }
+        h1, h2, h3 {
+            color: #8D5EB7;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .instructions {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #8D5EB7;
+        }
+        pre {
+            background-color: #1A161D;
+            color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+        }
+        button {
+            background-color: #8D5EB7;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #7d4ea7;
+        }
+        .step {
+            margin-bottom: 30px;
+        }
+        .error {
+            color: #D04014;
+            font-weight: bold;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fix Onboarding Deposit</h1>
+    
+    <div class="instructions">
+        <h2>The Problem</h2>
+        <p>The "Failed to process deposit" error is occurring because:</p>
+        <ol>
+            <li>The <code>FundingTransaction</code> model is trying to use a <code>wallet_id</code> column</li>
+            <li>This column doesn't exist in the <code>funding_transactions</code> database table</li>
+            <li>The frontend is using the wrong endpoint (<code>/funding/deposit</code> instead of <code>/funding/simple-deposit</code>)</li>
+        </ol>
+    </div>
+    
+    <div class="step">
+        <h2>Step 1: Fix the Onboarding Component</h2>
+        <div class="card">
+            <p>Replace the <code>handleDeposit</code> function in <code>resources/js/Pages/Onboarding/Index.tsx</code> with this code:</p>
+            <pre id="handleDepositCode">const handleDeposit = async (): Promise&lt;void&gt; => {
+  try {
+    setIsLoading(true);
+    setDepositError(null);
+    
+    // Get the CSRF token from the meta tag
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    
+    console.log('Starting deposit process with amount:', depositAmount);
+    
+    // Use the new simplified deposit endpoint
+    const response = await axios.post('/funding/simple-deposit', {
+      amount: parseFloat(depositAmount),
+    }, {
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      }
+    });
+    
+    console.log('Deposit response:', response.data);
+    
+    if (response.data.success) {
+      console.log('Deposit successful!');
+      setDepositSuccess(true);
+      setActiveStep(2);
+    } else {
+      console.error('Deposit failed:', response.data.message);
+      setDepositError(response.data.message || 'Failed to process deposit');
+    }
+  } catch (error) {
+    console.error('Error processing deposit:', error);
+    
+    // Extract error message from the response if available
+    const errorMessage = error.response?.data?.message || 
+                        error.response?.data?.error || 
+                        error.message || 
+                        'An unexpected error occurred';
+    
+    console.error('Error details:', errorMessage);
+    
+    // Show the error message to the user
+    setDepositError(errorMessage);
+  } finally {
+    setIsLoading(false);
+  }
+};</pre>
+            <button id="copyHandleDeposit">Copy Code</button>
+        </div>
+    </div>
+    
+    <div class="step">
+        <h2>Step 2: Test the Deposit Functionality</h2>
+        <div class="card">
+            <p>After updating the code, you can test the deposit functionality using our test page:</p>
+            <a href="/deposit-test.html" target="_blank">
+                <button>Open Deposit Test Page</button>
+            </a>
+        </div>
+    </div>
+    
+    <div class="step">
+        <h2>Step 3: Verify the Database Structure</h2>
+        <div class="card">
+            <p>If you're still having issues, you can check the actual structure of the funding_transactions table:</p>
+            <pre>
+// Run this SQL query in your database:
+SELECT column_name 
+FROM information_schema.columns 
+WHERE table_name = 'funding_transactions';</pre>
+            <p>This will show you all columns in the table, so you can confirm whether wallet_id exists.</p>
+        </div>
+    </div>
+    
+    <div class="step">
+        <h2>Alternative Solution: Update the Database</h2>
+        <div class="card">
+            <p>If you prefer to add the wallet_id column to the database instead of removing it from the code, you can create a migration:</p>
+            <pre>
+// Create a new migration file
+php artisan make:migration add_wallet_id_to_funding_transactions
+
+// In the migration file:
+public function up()
+{
+    Schema::table('funding_transactions', function (Blueprint $table) {
+        $table->uuid('wallet_id')->nullable()->after('connected_account_id');
+        $table->foreign('wallet_id')->references('id')->on('wallets');
+    });
+}
+
+// Run the migration
+php artisan migrate</pre>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('copyHandleDeposit').addEventListener('click', function() {
+            const code = document.getElementById('handleDepositCode');
+            const range = document.createRange();
+            range.selectNode(code);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            this.textContent = 'Copied!';
+            setTimeout(() => {
+                this.textContent = 'Copy Code';
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

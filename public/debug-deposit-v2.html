@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Deposit Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #1A161D;
+        }
+        h1 {
+            color: #8D5EB7;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input, button {
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #8D5EB7;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #7d4ea7;
+        }
+        pre {
+            background-color: #1A161D;
+            color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .error {
+            color: #D04014;
+            font-weight: bold;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Deposit Test</h1>
+    
+    <div class="card">
+        <h2>Step 1: Get CSRF Token</h2>
+        <button id="getCsrfToken">Get CSRF Token</button>
+        <div id="csrfResult" class="form-group">
+            <pre id="csrfOutput">Not fetched yet</pre>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>Step 2: Test Deposit</h2>
+        <div class="form-group">
+            <label for="amount">Amount to Deposit</label>
+            <input type="number" id="amount" value="100" min="1">
+        </div>
+        <div class="form-group">
+            <label for="csrfToken">CSRF Token</label>
+            <input type="text" id="csrfToken" placeholder="CSRF token will be filled automatically">
+        </div>
+        <button id="testDeposit">Test Deposit</button>
+        <div id="depositLoading" class="hidden">
+            <span class="loading"></span> Processing...
+        </div>
+        <div id="depositResult" class="form-group">
+            <h3>Response:</h3>
+            <pre id="depositOutput">Not tested yet</pre>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>Step 3: Direct Database Test</h2>
+        <p>This will bypass the controller and directly insert records into the database</p>
+        <button id="directTest">Run Direct Test</button>
+        <div id="directResult" class="form-group">
+            <h3>Response:</h3>
+            <pre id="directOutput">Not tested yet</pre>
+        </div>
+    </div>
+    
+    <script>
+        // Get elements
+        const getCsrfTokenBtn = document.getElementById('getCsrfToken');
+        const csrfOutput = document.getElementById('csrfOutput');
+        const csrfTokenInput = document.getElementById('csrfToken');
+        
+        const testDepositBtn = document.getElementById('testDeposit');
+        const depositOutput = document.getElementById('depositOutput');
+        const depositLoading = document.getElementById('depositLoading');
+        
+        const directTestBtn = document.getElementById('directTest');
+        const directOutput = document.getElementById('directOutput');
+        
+        // Get CSRF token
+        getCsrfTokenBtn.addEventListener('click', async () => {
+            try {
+                csrfOutput.textContent = 'Fetching...';
+                
+                const response = await fetch('/csrf-token');
+                const data = await response.json();
+                
+                if (data.csrf_token) {
+                    csrfOutput.innerHTML = `<span class="success">Success!</span>\nCSRF Token: ${data.csrf_token}`;
+                    csrfTokenInput.value = data.csrf_token;
+                } else {
+                    csrfOutput.innerHTML = `<span class="error">Error:</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                csrfOutput.innerHTML = `<span class="error">Error:</span>\n${error.message}`;
+                console.error('Error fetching CSRF token:', error);
+            }
+        });
+        
+        // Test deposit
+        testDepositBtn.addEventListener('click', async () => {
+            try {
+                depositLoading.classList.remove('hidden');
+                testDepositBtn.disabled = true;
+                
+                const amount = document.getElementById('amount').value;
+                const csrfToken = csrfTokenInput.value;
+                
+                if (!csrfToken) {
+                    depositOutput.innerHTML = `<span class="error">Error:</span>\nPlease get a CSRF token first`;
+                    depositLoading.classList.add('hidden');
+                    testDepositBtn.disabled = false;
+                    return;
+                }
+                
+                depositOutput.textContent = 'Processing deposit...';
+                
+                // Log the request details
+                console.log('Making deposit request with:', {
+                    amount: parseFloat(amount),
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const response = await fetch('/funding/deposit', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: parseFloat(amount)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    depositOutput.innerHTML = `<span class="success">Success!</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    depositOutput.innerHTML = `<span class="error">Error:</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                depositOutput.innerHTML = `<span class="error">Error:</span>\n${error.message}`;
+                console.error('Error testing deposit:', error);
+            } finally {
+                depositLoading.classList.add('hidden');
+                testDepositBtn.disabled = false;
+            }
+        });
+        
+        // Direct database test
+        directTestBtn.addEventListener('click', async () => {
+            try {
+                directOutput.textContent = 'Running direct test...';
+                
+                const response = await fetch('/direct-deposit-test.php');
+                const text = await response.text();
+                
+                directOutput.innerHTML = text;
+            } catch (error) {
+                directOutput.innerHTML = `<span class="error">Error:</span>\n${error.message}`;
+                console.error('Error running direct test:', error);
+            }
+        });
+        
+        // Auto-run CSRF token fetch on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            getCsrfTokenBtn.click();
+        });
+    </script>
+</body>
+</html>

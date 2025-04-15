@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deposit Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #1A161D;
+        }
+        h1 {
+            color: #8D5EB7;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input, button {
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #8D5EB7;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #7d4ea7;
+        }
+        pre {
+            background-color: #1A161D;
+            color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .error {
+            color: #D04014;
+            font-weight: bold;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .hidden {
+            display: none;
+        }
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #f1f1f1;
+            border: none;
+            cursor: pointer;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+            width: auto;
+        }
+        .tab-button.active {
+            background-color: #8D5EB7;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Deposit Test</h1>
+    
+    <div class="tab-buttons">
+        <button class="tab-button active" data-tab="direct-test">Direct Test</button>
+        <button class="tab-button" data-tab="api-test">API Test</button>
+        <button class="tab-button" data-tab="php-test">PHP Script Test</button>
+    </div>
+    
+    <div id="direct-test" class="tab-content active">
+        <div class="card">
+            <h2>Direct Database Test</h2>
+            <p>This will run a PHP script that directly inserts records into the database</p>
+            <button id="runDirectTest">Run Direct Test</button>
+            <div id="directLoading" class="hidden">
+                <span class="loading"></span> Processing...
+            </div>
+            <div class="form-group">
+                <h3>Response:</h3>
+                <pre id="directOutput">Not tested yet</pre>
+            </div>
+        </div>
+    </div>
+    
+    <div id="api-test" class="tab-content">
+        <div class="card">
+            <h2>API Test</h2>
+            <div class="form-group">
+                <label for="amount">Amount to Deposit</label>
+                <input type="number" id="amount" value="100" min="1">
+            </div>
+            <div class="form-group">
+                <label for="endpoint">Endpoint</label>
+                <select id="endpoint">
+                    <option value="/funding/deposit">Regular Deposit</option>
+                    <option value="/funding/simple-deposit" selected>Simple Deposit</option>
+                </select>
+            </div>
+            <button id="runApiTest">Test Deposit API</button>
+            <div id="apiLoading" class="hidden">
+                <span class="loading"></span> Processing...
+            </div>
+            <div class="form-group">
+                <h3>Response:</h3>
+                <pre id="apiOutput">Not tested yet</pre>
+            </div>
+        </div>
+    </div>
+    
+    <div id="php-test" class="tab-content">
+        <div class="card">
+            <h2>PHP Script Test</h2>
+            <p>This will run the test-deposit.php script</p>
+            <button id="runPhpTest">Run PHP Test</button>
+            <div id="phpLoading" class="hidden">
+                <span class="loading"></span> Processing...
+            </div>
+            <div class="form-group">
+                <h3>Response:</h3>
+                <pre id="phpOutput">Not tested yet</pre>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab functionality
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabId = button.getAttribute('data-tab');
+                
+                // Update active button
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                // Show active content
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === tabId) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+        
+        // Direct test
+        const runDirectTestBtn = document.getElementById('runDirectTest');
+        const directOutput = document.getElementById('directOutput');
+        const directLoading = document.getElementById('directLoading');
+        
+        runDirectTestBtn.addEventListener('click', async () => {
+            try {
+                directLoading.classList.remove('hidden');
+                runDirectTestBtn.disabled = true;
+                directOutput.textContent = 'Running direct test...';
+                
+                const response = await fetch('/test-deposit.php');
+                const text = await response.text();
+                
+                try {
+                    // Try to parse as JSON
+                    const data = JSON.parse(text);
+                    directOutput.innerHTML = JSON.stringify(data, null, 2);
+                } catch (e) {
+                    // If not JSON, just show the text
+                    directOutput.innerHTML = text;
+                }
+            } catch (error) {
+                directOutput.innerHTML = `<span class="error">Error:</span>\n${error.message}`;
+                console.error('Error running direct test:', error);
+            } finally {
+                directLoading.classList.add('hidden');
+                runDirectTestBtn.disabled = false;
+            }
+        });
+        
+        // API test
+        const runApiTestBtn = document.getElementById('runApiTest');
+        const apiOutput = document.getElementById('apiOutput');
+        const apiLoading = document.getElementById('apiLoading');
+        
+        runApiTestBtn.addEventListener('click', async () => {
+            try {
+                apiLoading.classList.remove('hidden');
+                runApiTestBtn.disabled = true;
+                apiOutput.textContent = 'Running API test...';
+                
+                const amount = document.getElementById('amount').value;
+                const endpoint = document.getElementById('endpoint').value;
+                
+                // Get CSRF token
+                const csrfResponse = await fetch('/csrf-token');
+                const csrfData = await csrfResponse.json();
+                
+                if (!csrfData.csrf_token) {
+                    apiOutput.innerHTML = `<span class="error">Error:</span>\nFailed to get CSRF token`;
+                    apiLoading.classList.add('hidden');
+                    runApiTestBtn.disabled = false;
+                    return;
+                }
+                
+                const csrfToken = csrfData.csrf_token;
+                
+                // Make deposit request
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: parseFloat(amount)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    apiOutput.innerHTML = `<span class="success">Success!</span>\n${JSON.stringify(data, null, 2)}`;
+                } else {
+                    apiOutput.innerHTML = `<span class="error">Error:</span>\n${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                apiOutput.innerHTML = `<span class="error">Error:</span>\n${error.message}`;
+                console.error('Error running API test:', error);
+            } finally {
+                apiLoading.classList.add('hidden');
+                runApiTestBtn.disabled = false;
+            }
+        });
+        
+        // PHP test
+        const runPhpTestBtn = document.getElementById('runPhpTest');
+        const phpOutput = document.getElementById('phpOutput');
+        const phpLoading = document.getElementById('phpLoading');
+        
+        runPhpTestBtn.addEventListener('click', async () => {
+            try {
+                phpLoading.classList.remove('hidden');
+                runPhpTestBtn.disabled = true;
+                phpOutput.textContent = 'Running PHP test...';
+                
+                const response = await fetch('/test-deposit.php');
+                const text = await response.text();
+                
+                try {
+                    // Try to parse as JSON
+                    const data = JSON.parse(text);
+                    phpOutput.innerHTML = JSON.stringify(data, null, 2);
+                } catch (e) {
+                    // If not JSON, just show the text
+                    phpOutput.innerHTML = text;
+                }
+            } catch (error) {
+                phpOutput.innerHTML = `<span class="error">Error:</span>\n${error.message}`;
+                console.error('Error running PHP test:', error);
+            } finally {
+                phpLoading.classList.add('hidden');
+                runPhpTestBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

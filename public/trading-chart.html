@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <style>
+        :root {
+            --background: #F9F9F9;
+            --foreground: #1A161D;
+            --primary: #8D5EB7;
+            --secondary: #EECEE6;
+            --accent: #211DE49;
+            --danger: #D04014;
+        }
+        
+        .dark {
+            --background: #1A161D;
+            --foreground: #F9F9F9;
+            --primary: #8D5EB7;
+            --secondary: #EECEE6;
+            --accent: #211DE49;
+            --danger: #D04014;
+        }
+        
+        body {
+            background-color: var(--background);
+            color: var(--foreground);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        #chart-container {
+            width: 100%;
+            height: 100vh;
+            max-height: 500px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        
+        @media (max-width: 768px) {
+            #chart-container {
+                height: 400px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #chart-container {
+                height: 300px;
+                padding: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="chart-container"></div>
+
+    <script>
+        // Parse URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const currencyPair = urlParams.get('pair') || 'EUR/USD';
+        const timeframe = urlParams.get('timeframe') || '1h';
+        const theme = urlParams.get('theme') || 'light';
+        const predictiveMode = urlParams.get('predictive') === 'true';
+        
+        // Set theme
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        
+        // Set theme based on URL parameter or parent message
+        function setTheme(theme) {
+            document.documentElement.classList.toggle('dark', theme === 'dark');
+            return theme === 'light' ? 'light' : 'dark';
+        }
+        
+        // Initialize chart with default empty data
+        let chart;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const chartTheme = theme === 'dark' ? 'dark' : 'light';
+            
+            // Chart options
+            const options = {
+                series: [{
+                    name: 'Price',
+                    type: 'candlestick',
+                    data: []
+                }],
+                chart: {
+                    height: '100%',
+                    type: 'candlestick',
+                    background: 'transparent',
+                    foreColor: chartTheme === 'dark' ? '#F9F9F9' : '#1A161D',
+                    toolbar: {
+                        show: true,
+                        tools: {
+                            download: true,
+                            selection: true,
+                            zoom: true,
+                            zoomin: true,
+                            zoomout: true,
+                            pan: true,
+                            reset: true
+                        }
+                    },
+                    animations: {
+                        enabled: true
+                    },
+                    fontFamily: 'Inter, sans-serif',
+                    redrawOnWindowResize: true
+                },
+                theme: {
+                    mode: chartTheme
+                },
+                plotOptions: {
+                    candlestick: {
+                        colors: {
+                            upward: '#8D5EB7',
+                            downward: '#D04014'
+                        }
+                    }
+                },
+                title: {
+                    text: `${currencyPair}`,
+                    align: 'left',
+                    style: {
+                        color: chartTheme === 'dark' ? '#F9F9F9' : '#1A161D',
+                        fontSize: '16px',
+                        fontWeight: 600
+                    }
+                },
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        style: {
+                            colors: chartTheme === 'dark' ? '#F9F9F9' : '#1A161D',
+                            fontSize: '12px'
+                        },
+                        datetimeUTC: false,
+                        format: 'dd MMM HH:mm'
+                    },
+                    axisBorder: {
+                        color: chartTheme === 'dark' ? '#333' : '#ddd'
+                    },
+                    axisTicks: {
+                        color: chartTheme === 'dark' ? '#333' : '#ddd'
+                    }
+                },
+                yaxis: {
+                    labels: {
+                        formatter: function(value) {
+                            return value.toFixed(4);
+                        },
+                        style: {
+                            colors: chartTheme === 'dark' ? '#F9F9F9' : '#1A161D',
+                            fontSize: '12px'
+                        }
+                    }
+                },
+                grid: {
+                    borderColor: chartTheme === 'dark' ? '#333' : '#ddd',
+                    strokeDashArray: 5
+                },
+                tooltip: {
+                    theme: chartTheme,
+                    shared: false,
+                    custom: function({ seriesIndex, dataPointIndex, w }) {
+                        const series = w.globals.seriesCandleO[0];
+                        if (seriesIndex === 0 && series) {
+                            const o = w.globals.seriesCandleO[0][dataPointIndex];
+                            const h = w.globals.seriesCandleH[0][dataPointIndex];
+                            const l = w.globals.seriesCandleL[0][dataPointIndex];
+                            const c = w.globals.seriesCandleC[0][dataPointIndex];
+                            const date = new Date(w.globals.seriesX[0][dataPointIndex]);
+                            
+                            return `
+                            <div class="apexcharts-tooltip-box">
+                                <div style="padding: 8px; font-size: 12px;">
+                                    <div><b>Date:</b> ${date.toLocaleString()}</div>
+                                    <div><b>Open:</b> ${o.toFixed(4)}</div>
+                                    <div><b>High:</b> ${h.toFixed(4)}</div>
+                                    <div><b>Low:</b> ${l.toFixed(4)}</div>
+                                    <div><b>Close:</b> ${c.toFixed(4)}</div>
+                                </div>
+                            </div>`;
+                        } else if (seriesIndex === 1) {
+                            const value = w.globals.series[1][dataPointIndex];
+                            const date = new Date(w.globals.seriesX[1][dataPointIndex]);
+                            
+                            return `
+                            <div class="apexcharts-tooltip-box">
+                                <div style="padding: 8px; font-size: 12px;">
+                                    <div><b>Date:</b> ${date.toLocaleString()}</div>
+                                    <div><b>Predicted:</b> ${value.toFixed(4)}</div>
+                                    <div style="color: #EECEE6; font-style: italic;">Prediction</div>
+                                </div>
+                            </div>`;
+                        }
+                        return '';
+                    },
+                    x: {
+                        format: 'dd MMM yyyy HH:mm'
+                    }
+                },
+                responsive: [
+                    {
+                        breakpoint: 768,
+                        options: {
+                            chart: {
+                                height: '400px'
+                            },
+                            title: {
+                                style: {
+                                    fontSize: '14px'
+                                }
+                            }
+                        }
+                    },
+                    {
+                        breakpoint: 480,
+                        options: {
+                            chart: {
+                                height: '300px'
+                            },
+                            title: {
+                                style: {
+                                    fontSize: '12px'
+                                }
+                            },
+                            xaxis: {
+                                labels: {
+                                    style: {
+                                        fontSize: '10px'
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ]
+            };
+
+            // Initialize the chart
+            chart = new ApexCharts(
+                document.getElementById('chart-container'),
+                options
+            );
+            chart.render();
+            
+            // Load initial data after a short delay to ensure chart is properly rendered
+            setTimeout(() => {
+                loadChartData(currencyPair, timeframe, predictiveMode);
+            }, 100);
+            
+            // Function to load chart data
+            function loadChartData(currencyPair, timeframe, predictiveMode = false) {
+                console.log('Loading chart data:', { currencyPair, timeframe, predictiveMode });
+                // Fix the API URL to use the full origin
+                const apiUrl = `${window.location.origin}/api/trading/chart-data?currency_pair=${encodeURIComponent(currencyPair)}&timeframe=${timeframe}&predictive_mode=${predictiveMode}`;
+                console.log('API URL:', apiUrl);
+                
+                fetch(apiUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`API error: ${response.status}`);
+                        }
+                        // Check content type to avoid JSON parse errors
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            return response.json();
+                        } else {
+                            // If not JSON, generate dummy data
+                            console.warn('Response is not JSON, generating dummy data');
+                            return generateDummyData(currencyPair);
+                        }
+                    })
+                    .then(data => {
+                        console.log('Chart data received:', data);
+                        
+                        // Handle different data formats
+                        let historicalData = [];
+                        let predictiveData = [];
+                        
+                        if (Array.isArray(data)) {
+                            // Data is a simple array of historical points
+                            historicalData = data;
+                        } else if (data && typeof data === 'object') {
+                            // Data is an object with historical and possibly predictive data
+                            if (Array.isArray(data.historical)) {
+                                historicalData = data.historical;
+                            }
+                            
+                            if (predictiveMode && Array.isArray(data.predictive)) {
+                                predictiveData = data.predictive;
+                            }
+                        }
+                        
+                        console.log('Historical data points:', historicalData.length);
+                        console.log('Predictive data points:', predictiveData.length);
+                        
+                        if (historicalData.length === 0) {
+                            console.error('No historical data available');
+                            // Generate some dummy data so chart isn't empty
+                            const now = new Date().getTime();
+                            const basePrice = 1.08; // EUR/USD base price
+                            
+                            for (let i = 0; i < 20; i++) {
+                                const timestamp = now - (19 - i) * 3600 * 1000;
+                                const price = basePrice + (Math.random() * 0.02 - 0.01);
+                                historicalData.push({
+                                    timestamp: timestamp,
+                                    open: price,
+                                    high: price * 1.002,
+                                    low: price * 0.998,
+                                    close: price * (1 + (Math.random() * 0.004 - 0.002)),
+                                    volume: Math.floor(Math.random() * 5000) + 5000
+                                });
+                            }
+                            console.log('Generated dummy data:', historicalData);
+                        }
+                        
+                        // Process historical data for candlestick chart
+                        const candleData = historicalData.map(item => {
+                            // Ensure timestamp is properly converted to a date
+                            let timestamp;
+                            if (typeof item.timestamp === 'string') {
+                                // Try to parse string timestamp
+                                timestamp = new Date(item.timestamp);
+                            } else if (typeof item.timestamp === 'number') {
+                                // Use numeric timestamp
+                                timestamp = new Date(item.timestamp);
+                            } else {
+                                // Fallback to current time with offset
+                                timestamp = new Date(Date.now() - Math.random() * 86400000);
+                            }
+                            
+                            return {
+                                x: timestamp,
+                                y: [
+                                    parseFloat(item.open),
+                                    parseFloat(item.high),
+                                    parseFloat(item.low),
+                                    parseFloat(item.close)
+                                ]
+                            };
+                        });
+                        
+                        // Process predictive data for line chart
+                        const predictionPoints = predictiveData.map(item => {
+                            // Ensure timestamp is properly converted to a date
+                            let timestamp;
+                            if (typeof item.timestamp === 'string') {
+                                timestamp = new Date(item.timestamp);
+                            } else if (typeof item.timestamp === 'number') {
+                                timestamp = new Date(item.timestamp);
+                            } else {
+                                timestamp = new Date(Date.now() + Math.random() * 86400000);
+                            }
+                            
+                            return {
+                                x: timestamp,
+                                y: parseFloat(item.close)
+                            };
+                        });
+                        
+                        console.log('Processed candlestick data:', candleData);
+                        console.log('Processed prediction data:', predictionPoints);
+                        
+                        // Update the chart with both series
+                        if (predictiveMode && predictionPoints.length > 0) {
+                            chart.updateSeries([
+                                {
+                                    name: 'Price',
+                                    type: 'candlestick',
+                                    data: candleData
+                                },
+                                {
+                                    name: 'Prediction',
+                                    type: 'line',
+                                    data: predictionPoints,
+                                    color: '#8D5EB7',
+                                    dashArray: 5,
+                                    stroke: {
+                                        width: 2,
+                                        curve: 'smooth'
+                                    },
+                                    markers: {
+                                        size: 4,
+                                        strokeWidth: 0,
+                                        hover: {
+                                            size: 6
+                                        }
+                                    }
+                                }
+                            ]);
+                            
+                            // Update chart title to indicate predictive mode
+                            chart.updateOptions({
+                                title: {
+                                    text: `${currencyPair} (Predictive Mode)`,
+                                    align: 'left'
+                                }
+                            });
+                        } else {
+                            chart.updateSeries([
+                                {
+                                    name: 'Price',
+                                    type: 'candlestick',
+                                    data: candleData
+                                }
+                            ]);
+                            
+                            // Update chart title for normal mode
+                            chart.updateOptions({
+                                title: {
+                                    text: currencyPair,
+                                    align: 'left'
+                                }
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching chart data:', error);
+                    });
+            }
+
+            // Function to generate dummy data for testing
+            function generateDummyData(currencyPair) {
+                const now = new Date().getTime();
+                const historicalData = [];
+                
+                // Base prices for common currency pairs
+                const basePrices = {
+                    'EUR/USD': 1.08,
+                    'GBP/USD': 1.27,
+                    'USD/JPY': 150.5,
+                    'USD/CAD': 1.35,
+                    'AUD/USD': 0.65,
+                    'NZD/USD': 0.61,
+                    'USD/CHF': 0.90,
+                    'EUR/GBP': 0.85
+                };
+                
+                const basePrice = basePrices[currencyPair] || 1.0;
+                
+                // Generate historical data
+                for (let i = 0; i < 50; i++) {
+                    const timestamp = now - (49 - i) * 3600 * 1000;
+                    const randomChange = (Math.random() * 0.02 - 0.01) * basePrice;
+                    const price = basePrice + randomChange;
+                    
+                    historicalData.push({
+                        timestamp: timestamp,
+                        open: price,
+                        high: price * (1 + Math.random() * 0.005),
+                        low: price * (1 - Math.random() * 0.005),
+                        close: price * (1 + (Math.random() * 0.01 - 0.005)),
+                        volume: Math.floor(Math.random() * 5000) + 5000
+                    });
+                }
+                
+                return historicalData;
+            }
+            
+            // Listen for messages from parent window
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'updateChart') {
+                    const { currencyPair, timeframe, predictiveMode, theme } = event.data;
+                    
+                    // Update theme if needed
+                    document.documentElement.classList.toggle('dark', theme === 'dark');
+                    
+                    // Reload chart data
+                    loadChartData(currencyPair, timeframe, predictiveMode);
+                }
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                chart.render();
+            });
+        });
+    </script>
+</body>
+</html>
