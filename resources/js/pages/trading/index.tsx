@@ -1,39 +1,31 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Head, router } from '@inertiajs/react';
-import axios from 'axios';
-import AppLayout from '../../layouts/app-layout';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { 
-  Table, 
-  TableHeader, 
-  TableRow, 
-  TableHead, 
-  TableBody, 
-  TableCell 
-} from '../../components/ui/table';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter 
-} from '../../components/ui/dialog';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '../../components/ui/select';
-import { useAppearance } from '../../hooks/use-appearance';
-import { Switch } from '../../components/ui/switch';
-import { useToast } from "../../components/ui/use-toast";
-import TradingChart from '../../components/trading/trading-chart';
-import { CurrencyPair } from '../../types/currency-pair'; // Use relative path
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Head, router, usePage } from "@inertiajs/react";
+import axios from "axios";
+import AppLayout from '@/layouts/app-layout';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { useAppearance } from '@/hooks/use-appearance';
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import TradingChart from '@/components/trading/trading-chart';
 
 // Define types for our data
 interface Position {
@@ -86,10 +78,10 @@ interface MarketOverview {
 }
 
 interface AvailablePairs {
-  forex: { id: number; symbol: string }[];
-  crypto: { id: number; symbol: string }[];
-  commodities: { id: number; symbol: string }[];
-  indices: { id: number; symbol: string }[];
+  forex: string[];
+  crypto: string[];
+  commodities: string[];
+  indices: string[];
 }
 
 interface TradingProps {
@@ -122,14 +114,27 @@ interface CandleData {
   pair?: string;
 }
 
-interface HistoricalDataItem {
-  timestamp: number; // Changed from date: string
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume?: number; // Volume might be optional
+interface SimpleSelectProps {
+  id?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
 }
+
+// Define types for Inertia router
+interface InertiaFormData {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+interface CurrencyPair {
+  symbol: string;
+  description?: string; // Optional as sometimes it might just be the symbol string
+}
+
+type PairInput = string | CurrencyPair;
 
 // Format currency helper function
 const formatCurrency = (value: number | undefined | null): string => {
@@ -142,6 +147,33 @@ const formatCurrency = (value: number | undefined | null): string => {
   }).format(safeValue);
 };
 
+const SimpleSelect: React.FC<SimpleSelectProps> = ({
+  id,
+  value,
+  onChange,
+  placeholder = "Select an option",
+  className = "",
+  options,
+  disabled = false
+}) => {
+  return (
+    <select
+      id={id}
+      className={`flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+    >
+      {value === "" && <option key="placeholder" value="" disabled>{placeholder}</option>}
+      {options.map((option, index) => (
+        <option key={`${option.value}-${index}`} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+};
+
 const Trading = ({ 
   positions = [], 
   orders = [], 
@@ -149,9 +181,10 @@ const Trading = ({
   marketOverview = { indices: [], forex: [], crypto: [] },
   availablePairs = { forex: [], crypto: [], commodities: [], indices: [] }
 }: TradingProps) => {
-  const [localPositions, setLocalPositions] = useState<Position[]>(positions);
-  // We keep setLocalOrders for future use when implementing order cancellation
-  const [localOrders] = useState<Order[]>(orders);
+  const { props } = usePage();
+  const { flash } = props as unknown as { flash: { success?: string; error?: string } }; // Type assertion for flash
+  const { toast } = useToast();
+
   const [isAddPositionOpen, setIsAddPositionOpen] = useState(false);
   const [isClosePositionOpen, setIsClosePositionOpen] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
@@ -165,111 +198,103 @@ const Trading = ({
     take_profit: null,
   });
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1h');
-  const [selectedPair, setSelectedPair] = useState<string>(''); // Start empty string
-  const [details, setDetails] = useState<CurrencyPair | null>(null); // Initialize details to null
-  const [predictiveMode, setPredictiveMode] = useState(false);
+  const [selectedPair, setSelectedPair] = useState('EUR/USD');
+  const [predictiveMode, setPredictiveMode] = useState<boolean>(false);
   
   const { appearance } = useAppearance();
-  const { toast } = useToast();
   
-  // Helper function to generate fallback prices (extracted logic)
-  const generateFallbackPrices = useCallback(() => {
-    console.log('Generating fallback/mock prices.');
-    const fallbackPrices: Record<string, CurrentPrice> = {};
-    const basePrices: Record<string, number> = {
-      'EUR/USD': 1.0876,
-      'USD/JPY': 151.62,
-      'GBP/USD': 1.2542,
-      'USD/CHF': 0.9042,
-      'AUD/USD': 0.6614,
-      'USD/CAD': 1.3614,
-      'NZD/USD': 0.6014,
-    };
-
-    const basePrice = basePrices[selectedPair] || 1.0;
-    const randomVariation = (Math.random() * 0.02) - 0.01;
-    fallbackPrices[selectedPair] = {
-      price: basePrice * (1 + randomVariation),
-      timestamp: new Date().toISOString()
-    };
-
-    localPositions.forEach(position => {
-      if (!fallbackPrices[position.currency_pair]) {
-        const posBasePrice = basePrices[position.currency_pair] || position.open_price || 1.0;
-        const posRandomVariation = (Math.random() * 0.02) - 0.01;
-        fallbackPrices[position.currency_pair] = {
-          price: posBasePrice * (1 + posRandomVariation),
-          timestamp: new Date().toISOString()
-        };
-      }
-    });
-    setCurrentPrices(fallbackPrices);
-  }, [selectedPair, localPositions]); // Dependencies for generateFallbackPrices
-
-  // Fetch current prices function
+  // Fetch current prices
   const fetchCurrentPrices = useCallback(async () => {
-    // Only fetch if a pair is selected
-    if (!selectedPair) {
-      console.log('No pair selected, skipping price fetch');
-      return;
-    }
-    
     try {
-      // Use the selectedPair ID directly (not as part of a path segment)
-      const response = await axios.get(`/api/market-data/current/${selectedPair}`);
-      
-      if (response.data && response.data.current) {
-        // Process current price data
-        setCurrentPrices(response.data.current);
-      } else {
-        console.warn('Invalid response format for current prices');
+      const response = await axios.get('/trading/chart-data', {
+        params: {
+          currency_pair: selectedPair,
+          timeframe: selectedTimeframe
+        }
+      });
+      if (response.data) {
+        setCurrentPrices(response.data);
       }
     } catch (error) {
       console.error('Failed to fetch current prices:', error);
-      // Generate fallback prices only if needed
-      console.log('Generating fallback/mock prices.');
-      generateFallbackPrices();
+      
+      // Fallback: Generate mock data for the chart when the API fails
+      const fallbackPrices: Record<string, CurrentPrice> = {};
+      
+      // Base prices for common currency pairs
+      const basePrices: Record<string, number> = {
+        'EUR/USD': 1.0876,
+        'USD/JPY': 151.62,
+        'GBP/USD': 1.2542,
+        'USD/CHF': 0.9042,
+        'AUD/USD': 0.6614,
+        'USD/CAD': 1.3614,
+        'NZD/USD': 0.6014,
+      };
+      
+      // Create fallback data for the selected pair
+      const basePrice = basePrices[selectedPair] || 1.0;
+      // Add a small random variation to simulate market movement
+      const randomVariation = (Math.random() * 0.02) - 0.01; // -1% to +1%
+      fallbackPrices[selectedPair] = {
+        price: basePrice * (1 + randomVariation),
+        timestamp: new Date().toISOString()
+      };
+      
+      // Also ensure we have prices for all positions
+      positions.forEach(position => {
+        if (!fallbackPrices[position.currency_pair]) {
+          const posBasePrice = basePrices[position.currency_pair] || position.open_price || 1.0;
+          const posRandomVariation = (Math.random() * 0.02) - 0.01;
+          fallbackPrices[position.currency_pair] = {
+            price: posBasePrice * (1 + posRandomVariation),
+            timestamp: new Date().toISOString()
+          };
+        }
+      });
+      
+      setCurrentPrices(fallbackPrices);
     }
-  }, [selectedPair, generateFallbackPrices]); // Add selectedPair and generateFallbackPrices as dependencies
-
+  }, [selectedPair, selectedTimeframe, positions]);
+  
   // Set up axios defaults and initialize
   useEffect(() => {
+    // Configure axios for Laravel Sanctum
     axios.defaults.withCredentials = true;
     axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
     
+    // Get the CSRF token from the meta tag and set it as a default header
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    
     if (csrfToken) {
       axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
     } else {
       console.warn('CSRF token not found in meta tags');
     }
     
+    // Initialize CSRF protection for Sanctum
     const initCsrf = async () => {
       try {
+        // This endpoint sets the CSRF cookie
         await axios.get('/sanctum/csrf-cookie');
         console.log('CSRF cookie initialized successfully');
         
-        // Only fetch prices if a pair is selected
-        if (selectedPair) {
-          fetchCurrentPrices();
-        }
+        // Now fetch current prices
+        fetchCurrentPrices();
       } catch (error) {
-        console.error('Error initializing CSRF:', error);
+        console.error('Error initializing CSRF protection:', error);
+        // Try to fetch prices anyway
+        fetchCurrentPrices();
       }
     };
     
+    // Initialize CSRF protection
     initCsrf();
     
-    // Set up interval but only fetch if selectedPair exists
-    const interval = setInterval(() => {
-      if (selectedPair) {
-        fetchCurrentPrices();
-      }
-    }, 60000); // Update every minute
+    // Set up interval for fetching prices
+    const interval = setInterval(fetchCurrentPrices, 60000); // Update every minute
     
     return () => clearInterval(interval);
-  }, [fetchCurrentPrices, selectedPair]); // Add selectedPair as dependency
+  }, [fetchCurrentPrices]);
   
   // Update chart when pair, timeframe, or appearance changes
   const updateChart = useCallback(() => {
@@ -289,6 +314,22 @@ const Trading = ({
     updateChart();
   }, [selectedPair, selectedTimeframe, predictiveMode, appearance, updateChart]);
   
+  useEffect(() => {
+    if (flash?.success) {
+      toast({
+        title: "Success",
+        description: flash.success,
+      });
+    }
+    if (flash?.error) {
+      toast({
+        title: "Error",
+        description: flash.error,
+        variant: "destructive",
+      });
+    }
+  }, [flash, toast]);
+
   const handleAddPosition = () => {
     setIsAddPositionOpen(true);
   };
@@ -301,6 +342,7 @@ const Trading = ({
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
+    // Handle different field types appropriately
     if (name === 'stop_loss' || name === 'take_profit') {
       setFormData({
         ...formData,
@@ -319,117 +361,133 @@ const Trading = ({
     }
   };
   
-  const handleTradeTypeChange = (value: string) => {
-    setFormData({
-      ...formData,
-      trade_type: value
-    });
-  };
-  
-  const handleCurrencyPairChange = (value: string) => {
-    setFormData({
-      ...formData,
-      currency_pair: value
-    });
-  };
-  
-  const handleAddPositionSubmit = async () => {
+  const handleAddPositionSubmit = () => {
     setIsLoading(true);
-    try {
-      router.post('/trading', {
-        currency_pair: formData.currency_pair,
-        order_type: 'MARKET',
-        side: formData.trade_type,
-        quantity: formData.quantity,
-        price: null,
-        stop_loss: formData.stop_loss,
-        take_profit: formData.take_profit,
-        time_in_force: 'GTC',
-      }, {
-        onSuccess: () => {
-          fetchPositions();
-          
-          closeAddPositionDialog();
-          setFormData({
-            currency_pair: '',
-            trade_type: 'BUY',
-            quantity: 0,
-            stop_loss: null,
-            take_profit: null,
-          });
-        },
-        onError: (errors) => {
-          console.error('Failed to add position:', errors);
-        },
-        onFinish: () => {
-          setIsLoading(false);
-        }
+    
+    // Validate form data
+    if (!formData.currency_pair) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a currency pair.",
+        variant: "destructive",
       });
-    } catch (error) {
-      console.error('Failed to add position:', error);
       setIsLoading(false);
+      return;
     }
-  };
-  
-  const fetchPositions = async () => {
-    try {
-      const response = await axios.get('/trading');
-      if (response.data && response.data.positions) {
-        setLocalPositions(response.data.positions);
+    
+    if (!formData.trade_type) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a trade type.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
+    if (!formData.quantity || formData.quantity <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid quantity.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
+    // Submit the form
+    // Cast to unknown first to satisfy TypeScript's type checking
+    router.post("/trading/positions", formData as unknown as InertiaFormData, {
+      onSuccess: () => {
+        toast({
+          title: "Position Added",
+          description: "Your position has been added successfully.",
+        });
+        
+        // Reset form data
+        setFormData({
+          currency_pair: '',
+          trade_type: 'BUY',
+          quantity: 0,
+          stop_loss: null,
+          take_profit: null,
+        });
+        
+        closeAddPositionDialog();
+      },
+      onError: (errors: Record<string, string>) => {
+        console.error('Failed to add position:', errors);
+        toast({
+          title: "Error Adding Position",
+          description: Object.values(errors).join(', ') || "An unexpected error occurred.",
+          variant: "destructive",
+        });
+      },
+      onFinish: () => {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch positions:', error);
-    }
+    });
   };
   
-  const closePosition = async () => {
+  const closePosition = () => {
     if (!selectedPosition) return;
     
     setIsLoading(true);
-    try {
-      router.post(`/trading/positions/${selectedPosition.id}/close`, {}, {
-        onSuccess: () => {
-          setLocalPositions(localPositions.filter(p => p.id !== selectedPosition.id));
-          closeClosePositionDialog();
-          setSelectedPosition(null);
-        },
-        onError: (errors) => {
-          console.error('Failed to close position:', errors);
-        },
-        onFinish: () => {
-          setIsLoading(false);
-        }
-      });
-    } catch (error) {
-      console.error('Failed to close position:', error);
-      setIsLoading(false);
-    }
+    
+    router.post(`/trading/positions/${selectedPosition.id}/close`, {}, {
+      onSuccess: () => {
+        toast({
+          title: "Position Closed",
+          description: "Your position has been closed successfully.",
+        });
+        
+        closeClosePositionDialog();
+        setSelectedPosition(null);
+      },
+      onError: (errors: Record<string, string>) => {
+        console.error('Failed to close position:', errors);
+        toast({
+          title: "Error Closing Position",
+          description: Object.values(errors).join(', ') || "An unexpected error occurred.",
+          variant: "destructive",
+        });
+      },
+      onFinish: () => {
+        setIsLoading(false);
+      }
+    });
   };
 
   const closeAddPositionDialog = () => {
+    // Ensure we clear focus before closing the dialog
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    setIsAddPositionOpen(false);
+    
+    // Add a small delay to ensure focus is properly cleared
+    setTimeout(() => {
+      setIsAddPositionOpen(false);
+    }, 10);
   };
 
   const closeClosePositionDialog = () => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
     setIsClosePositionOpen(false);
   };
 
+  // Function to toggle between demo and live trading modes
   const toggleTradingMode = async () => {
     try {
-      const response = await axios.post('/trading/toggle-mode');
+      const response = await axios.post<{ success: boolean; message: string }>('/trading/toggle-mode');
       
       if (response.data.success) {
+        // Update the account information with the new mode
+        // Since we can't use setAccount, we'll reload the page to get the updated account info
         toast({
           title: "Success",
           description: "Trading mode updated successfully"
         });
         
+        // Reload the page to get the updated account info
         setTimeout(() => {
           router.reload();
         }, 1500);
@@ -450,106 +508,88 @@ const Trading = ({
     }
   };
 
-  const fetchHistoricalData = useCallback(async (pairId: number, timeframe: string, count: number = 200): Promise<CandleData[]> => {
-    console.log('[TradingPage] fetchHistoricalData called with:', { pairId, timeframe }); // <-- Log entry & params
-    console.log('[TradingPage] Attempting axios.get for historical data...'); // <-- Log before axios call
-    try {
-      // Ensure CSRF token is initialized before making the request
-      await axios.get('/sanctum/csrf-cookie');
-
-      const response = await axios.get('/trading/historical-data', {
-        params: {
-          currency_pair: pairId,
-          timeframe: timeframe,
-          count: count
-        }
-      });
-
-      console.log('Raw API Historical Data:', response.data); // <-- Log raw data
-
-      // Adjust to handle the new response structure { historical: [], predictive: {} }
-      if (response.data && response.data.historical && Array.isArray(response.data.historical)) {
-        // Transform the historical data array
-        const historicalData = response.data.historical;
-        const transformedData: CandleData[] = historicalData.map((item: HistoricalDataItem) => ({
-          x: new Date(item.timestamp), // Use item.timestamp directly
-          y: [
-            item.open,
-            item.high,
-            item.low,
-            item.close
-          ] as [number, number, number, number], // Ensure it's a 4-element tuple
-          pair: pairId
-        }));
-        console.log(`Received and transformed ${transformedData.length} data points.`);
-        return transformedData;
-      } else {
-        console.error('Invalid data format received from API:', response.data);
-        toast({
-          title: "Chart Error",
-          description: "Received invalid data format for chart. Expected { historical: [...] }.",
-          variant: "destructive",
-        });
-        return []; // Return empty array if data is not as expected
+  // Helper function to convert availablePairs to options array
+  const getPairOptions = useCallback((): Array<{ value: string; label: string }> => {
+    if (!availablePairs) return [];
+    
+    // Helper function to safely convert a pair (string or object) into an option object
+    const pairToOption = (pair: PairInput) => {
+      if (typeof pair === 'string') {
+        return { value: pair, label: pair };
+      } else if (pair && typeof pair === 'object' && pair.symbol) {
+        return { value: pair.symbol, label: `${pair.symbol} - ${pair.description || ''}`.trim() };
       }
-    } catch (error: unknown) { // Changed from any to unknown
-      console.error('Error fetching historical data:', error);
-      let errorMessage = "Could not fetch chart data.";
+      // Handle unexpected types gracefully, though ideally the input should always match PairInput
+      console.warn('Unexpected pair type:', pair);
+      return { value: 'unknown', label: 'Unknown Pair' };
+    };
+    
+    // Process each category of pairs
+    const forexPairs = Array.isArray(availablePairs.forex) 
+      ? availablePairs.forex.map(pairToOption) 
+      : [];
+    
+    const cryptoPairs = Array.isArray(availablePairs.crypto) 
+      ? availablePairs.crypto.map(pairToOption) 
+      : [];
+    
+    const commodityPairs = Array.isArray(availablePairs.commodities) 
+      ? availablePairs.commodities.map(pairToOption) 
+      : [];
+    
+    const indicesPairs = Array.isArray(availablePairs.indices) 
+      ? availablePairs.indices.map(pairToOption) 
+      : [];
+    
+    // Combine all pairs
+    return [...forexPairs, ...cryptoPairs, ...commodityPairs, ...indicesPairs];
+  }, [availablePairs]);
 
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          // Server responded with a status code outside the 2xx range
-          console.error('API Error Response:', error.response.data);
-          errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
-        } else if (error.request) {
-          // Request was made but no response received
-          console.error('API No Response:', error.request);
-          errorMessage = "No response from server. Check network connection.";
-        } else {
-          // Something happened in setting up the request
-          console.error('API Request Setup Error:', error.message);
-          errorMessage = `Error setting up request: ${error.message}`;
-        }
-      } else if (error instanceof Error) {
-        // Handle non-Axios errors (e.g., errors during data transformation)
-        console.error('Non-API Error:', error);
-        errorMessage = error.message || 'An unexpected error occurred.';
-      } else {
-        console.error('Unknown Error:', error);
-        errorMessage = 'An unknown error occurred.';
-      }
-
-      toast({
-        title: "Chart Data Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      return []; // Return empty array on error
-    }
-  }, [toast]); // Added toast dependency
+  const addPositionDialogContentRef = useRef<HTMLDivElement>(null); // Ref for Add Position Dialog Content
+  const closePositionDialogContentRef = useRef<HTMLDivElement>(null); // Ref for Close Position Dialog Content
 
   useEffect(() => {
-    if (selectedPair) {
-      const fetchDetails = async () => {
-        try {
-          // Use the selectedPair ID directly (not as part of a path segment)
-          const response = await axios.get(`/api/currency-pairs/${selectedPair}`);
-          setDetails(response.data); // <-- Call setDetails here
-        } catch (error: unknown) { // <-- Use unknown
-          console.error(`Error fetching details for pair ${selectedPair}:`, error);
-          setDetails(null); // Reset details on error
-          // Add toast notification for fetch details error
-          toast({
-            title: "Error",
-            description: `Failed to fetch details: ${error instanceof Error ? error.message : 'Unknown error'}`, // <-- Type check
-            variant: "destructive",
-          });
-        }
-      };
-      fetchDetails();
+    if (availablePairs) {
+      console.log('Available pairs:', availablePairs);
     }
-  }, [selectedPair, toast]); // <-- Added toast dependency
- 
+  }, [availablePairs]);
+
+  useEffect(() => {
+    if (availablePairs) {
+      console.log('Available pairs structure:', JSON.stringify(availablePairs, null, 2));
+    }
+  }, [availablePairs]);
+
+  // Define fetchHistoricalData function
+  const fetchHistoricalData = async (pairSymbol: string, timeframe: string, count: number = 200): Promise<CandleData[]> => {
+    console.log(`Fetching data for ${pairSymbol}, timeframe: ${timeframe}, count: ${count}`);
+    // In a real app, fetch data from an API endpoint
+    // For now, generate mock data:
+    const data: CandleData[] = [];
+    let lastClose = 1.10000 + (Math.random() - 0.5) * 0.1; // Start with some variation
+    const timeframeMs = 60 * 60 * 1000; // Use the helper
+    let currentTime = new Date().getTime() - count * timeframeMs;
+
+    for (let i = 0; i < count; i++) {
+      const open = lastClose;
+      const high = open + Math.random() * 0.00100;
+      const low = open - Math.random() * 0.00100;
+      const close = low + Math.random() * (high - low);
+      // const volume = Math.random() * 10000 + 5000; // Volume not used by chart's tuple
+      data.push({
+        x: new Date(currentTime),
+        y: [open, high, low, close], // Ensure y is the tuple [open, high, low, close]
+        pair: pairSymbol
+      });
+      lastClose = close;
+      currentTime += timeframeMs;
+    }
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    console.log(`Returning ${data.length} data points.`);
+    return data;
+  };
+
   return (
     <AppLayout>
       <Head title="Trading">
@@ -580,7 +620,8 @@ const Trading = ({
                       id="demo-mode-toggle"
                       className={`${
                         account.mode === 'LIVE' ? 'bg-[#8D5EB7]' : 'bg-gray-400'
-                      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#211DE49] focus:ring-offset-2`}
+                      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 bg-input hover:bg-accent cursor-pointer`
+                    }
                     >
                       <span
                         className={`${
@@ -631,44 +672,32 @@ const Trading = ({
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Trading Chart</CardTitle>
               <div className="flex space-x-2">
-                <Select 
+                <SimpleSelect 
+                  id="chart-pair-select"
                   value={selectedPair} 
-                  onValueChange={(value) => {
+                  onChange={(value) => {
                     setSelectedPair(value);
                   }}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select pair" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availablePairs && availablePairs.crypto && availablePairs.crypto.map((pair) => (
-                      <SelectItem key={pair.id} value={String(pair.id)}>
-                        {pair.symbol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={getPairOptions()}
+                />
                 
-                <Select 
+                <SimpleSelect 
+                  id="chart-timeframe-select"
                   value={selectedTimeframe} 
-                  onValueChange={(value) => {
+                  onChange={(value) => {
                     setSelectedTimeframe(value);
                   }}
-                >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Timeframe" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem key="timeframe-1m" value="1m">1 Minute</SelectItem>
-                    <SelectItem key="timeframe-5m" value="5m">5 Minutes</SelectItem>
-                    <SelectItem key="timeframe-15m" value="15m">15 Minutes</SelectItem>
-                    <SelectItem key="timeframe-30m" value="30m">30 Minutes</SelectItem>
-                    <SelectItem key="timeframe-1h" value="1h">1 Hour</SelectItem>
-                    <SelectItem key="timeframe-4h" value="4h">4 Hours</SelectItem>
-                    <SelectItem key="timeframe-1d" value="1d">1 Day</SelectItem>
-                    <SelectItem key="timeframe-1w" value="1w">1 Week</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: '1m', label: '1 Minute' },
+                    { value: '5m', label: '5 Minutes' },
+                    { value: '15m', label: '15 Minutes' },
+                    { value: '30m', label: '30 Minutes' },
+                    { value: '1h', label: '1 Hour' },
+                    { value: '4h', label: '4 Hours' },
+                    { value: '1d', label: '1 Day' },
+                    { value: '1w', label: '1 Week' },
+                  ]}
+                />
                 
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="predictive-mode" className="cursor-pointer">
@@ -682,25 +711,15 @@ const Trading = ({
                     <span className={`${predictiveMode ? "translate-x-6 bg-purple-500" : "translate-x-1 bg-foreground"} inline-block h-4 w-4 rounded-full transition-transform`} />
                   </div>
                 </div>
-            </div>
+              </div>
             </CardHeader>
-            <CardContent className="h-[500px] p-0 overflow-hidden pb-4">
-              {/* Conditionally render TradingChart */}
-              {selectedPair && details ? (
-                <TradingChart
-                  pairId={parseInt(selectedPair, 10)} // Convert string pairId to number
-                  timeframe={selectedTimeframe}
-                  currencyPair={details} // Corrected: Pass the details object
-                  historicalDataFn={fetchHistoricalData} // Pass the defined function
-                  predictiveMode={predictiveMode}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">Select a currency pair to view the chart.</p>
-                  {/* Or use a Skeleton loader */}
-                  {/* <Skeleton className="w-full h-full" /> */}
-                </div>
-              )}
+            <CardContent>
+            <TradingChart
+    pairSymbol={selectedPair} // Changed from pairId to pairSymbol
+    timeframe={selectedTimeframe}
+    predictiveMode={predictiveMode} // Pass the predictiveMode state
+    historicalDataFn={fetchHistoricalData} // Pass the defined function
+/>
             </CardContent>
           </Card>
 
@@ -725,12 +744,12 @@ const Trading = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {localPositions.length === 0 ? (
+                  {positions.length === 0 ? (
                     <TableRow key="no-positions">
                       <TableCell colSpan={8} className="text-center">No open positions</TableCell>
                     </TableRow>
                   ) : (
-                    localPositions.map((position, index) => (
+                    positions.map((position, index) => (
                       <TableRow key={position.id}>
                         <TableCell key={`pos-pair-${index}`}>{position.currency_pair}</TableCell>
                         <TableCell key={`pos-type-${index}`} className={position.trade_type === 'BUY' ? 'text-green-500' : 'text-red-500'}>
@@ -795,12 +814,12 @@ const Trading = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {localOrders.length === 0 ? (
+                  {orders.length === 0 ? (
                     <TableRow key="no-orders">
                       <TableCell colSpan={6} className="text-center">No pending orders</TableCell>
                     </TableRow>
                   ) : (
-                    localOrders.map((order, index) => (
+                    orders.map((order, index) => (
                       <TableRow key={order.id}>
                         <TableCell key={`order-pair-${index}`}>{order.currency_pair}</TableCell>
                         <TableCell key={`order-type-${index}`} className={order.trade_type === 'BUY' ? 'text-green-500' : 'text-red-500'}>
@@ -905,7 +924,22 @@ const Trading = ({
           if (!open) closeAddPositionDialog();
           else setIsAddPositionOpen(true);
         }}>
-          <DialogContent>
+          <DialogContent 
+            ref={addPositionDialogContentRef} 
+            className="sm:max-w-[425px]" 
+            onOpenAutoFocus={(e) => {
+              // Only prevent default focus if needed for accessibility
+              // Don't prevent focus completely as it might affect dropdown rendering
+              e.preventDefault();
+              // Focus the first interactive element manually after a short delay
+              setTimeout(() => {
+                const firstFocusable = addPositionDialogContentRef.current?.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') as HTMLElement;
+                if (firstFocusable) {
+                  firstFocusable.focus();
+                }
+              }, 50);
+            }}
+          >
             <DialogHeader>
               <DialogTitle>Add Position</DialogTitle>
               <DialogDescription>
@@ -916,31 +950,36 @@ const Trading = ({
             <div className="space-y-4">
               <div>
                 <Label htmlFor="currency_pair">Currency Pair</Label>
-                <Select value={formData.currency_pair} onValueChange={handleCurrencyPairChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select currency pair" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availablePairs && availablePairs.crypto && availablePairs.crypto.map((pair) => (
-                      <SelectItem key={pair.id} value={String(pair.id)}>
-                        {pair.symbol}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SimpleSelect 
+                  id="add_currency_pair"
+                  value={formData.currency_pair}
+                  onChange={(value) => {
+                    setFormData({
+                      ...formData,
+                      currency_pair: value
+                    });
+                  }}
+                  placeholder="Select currency pair"
+                  options={getPairOptions()}
+                />
               </div>
               
               <div>
                 <Label htmlFor="trade_type">Trade Type</Label>
-                <Select value={formData.trade_type} onValueChange={handleTradeTypeChange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem key="trade-type-buy" value="BUY">Buy (Long)</SelectItem>
-                    <SelectItem key="trade-type-sell" value="SELL">Sell (Short)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SimpleSelect 
+                  id="add_trade_type"
+                  value={formData.trade_type}
+                  onChange={(value) => {
+                    setFormData({
+                      ...formData,
+                      trade_type: value
+                    });
+                  }}
+                  options={[
+                    { value: 'BUY', label: 'Buy (Long)' },
+                    { value: 'SELL', label: 'Sell (Short)' }
+                  ]}
+                />
               </div>
               
               <div>
@@ -949,7 +988,7 @@ const Trading = ({
                   id="quantity"
                   name="quantity"
                   type="number"
-                  value={formData.quantity || ''}
+                  value={formData.quantity}
                   onChange={handleFormChange}
                 />
               </div>
@@ -960,7 +999,7 @@ const Trading = ({
                   id="stop_loss"
                   name="stop_loss"
                   type="number"
-                  value={formData.stop_loss || ''}
+                  value={formData.stop_loss ?? ''}
                   onChange={handleFormChange}
                 />
               </div>
@@ -971,7 +1010,7 @@ const Trading = ({
                   id="take_profit"
                   name="take_profit"
                   type="number"
-                  value={formData.take_profit || ''}
+                  value={formData.take_profit ?? ''}
                   onChange={handleFormChange}
                 />
               </div>
@@ -993,7 +1032,22 @@ const Trading = ({
           if (!open) closeClosePositionDialog();
           else setIsClosePositionOpen(true);
         }}>
-          <DialogContent>
+          <DialogContent 
+            ref={closePositionDialogContentRef} 
+            className="sm:max-w-[425px]" 
+            onOpenAutoFocus={(e) => {
+              // Only prevent default focus if needed for accessibility
+              // Don't prevent focus completely as it might affect dropdown rendering
+              e.preventDefault();
+              // Focus the first interactive element manually after a short delay
+              setTimeout(() => {
+                const firstFocusable = closePositionDialogContentRef.current?.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') as HTMLElement;
+                if (firstFocusable) {
+                  firstFocusable.focus();
+                }
+              }, 50);
+            }}
+          >
             <DialogHeader>
               <DialogTitle>Close Position</DialogTitle>
               <DialogDescription>

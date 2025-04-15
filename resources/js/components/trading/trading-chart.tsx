@@ -26,15 +26,15 @@ interface PredictionSeriesData {
 }
 
 interface TradingChartProps {
-    pairId: number;
+    pairSymbol: string;
     timeframe: string;
     currencyPair?: CurrencyPair;
-    historicalDataFn: (pairId: number, timeframe: string, count?: number) => Promise<CandleData[] | RawDataPoint[]>;
+    historicalDataFn: (pairSymbol: string, timeframe: string, count?: number) => Promise<CandleData[] | RawDataPoint[]>;
     predictiveMode?: boolean;
 }
 
 const TradingChart: React.FC<TradingChartProps> = ({
-    pairId,
+    pairSymbol,
     timeframe,
     currencyPair,
     historicalDataFn,
@@ -48,7 +48,10 @@ const TradingChart: React.FC<TradingChartProps> = ({
     const [predictionSeriesData, setPredictionSeriesData] = useState<PredictionSeriesData[]>([]);
     
     // Default to 5 decimal places for most currency pairs
-    const pipDigits = (currencyPair && currencyPair.symbol) ? (currencyPair.symbol.includes('JPY') ? 3 : 5) : 5;
+    const pipDigits = useMemo(() => {
+        const symbol = currencyPair?.symbol || pairSymbol || '';
+        return symbol.toUpperCase().includes('JPY') ? 3 : 5;
+    }, [currencyPair, pairSymbol]);
 
     const predictionSeries = useMemo(() => {
         if (!predictiveMode || !candleData || candleData.length === 0) {
@@ -83,7 +86,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
 
     useEffect(() => {
         console.log('[TradingChart] useEffect triggered. Props:', { 
-            pairId, 
+            pairSymbol, 
             timeframe, 
             currencyPairName: currencyPair?.symbol, 
             hasHistoricalDataFn: !!historicalDataFn 
@@ -93,7 +96,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
         setError(null);
         
         // Validate props
-        if (!pairId || isNaN(pairId) || !timeframe || !historicalDataFn) {
+        if (!pairSymbol || !timeframe || !historicalDataFn) {
             console.log('[TradingChart] Invalid props, staying in loading state');
             return;
         }
@@ -103,7 +106,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
         
         const fetchData = async () => {
             try {
-                const rawData = await historicalDataFn(pairId, timeframe);
+                const rawData = await historicalDataFn(pairSymbol, timeframe);
                 
                 if (!Array.isArray(rawData) || rawData.length === 0) {
                     setError('No data available for the selected pair and timeframe');
@@ -160,7 +163,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
         };
         
         fetchData();
-    }, [pairId, timeframe, historicalDataFn, currencyPair?.symbol]);
+    }, [pairSymbol, timeframe, historicalDataFn, currencyPair?.symbol]);
 
     // Memoize chart options to prevent unnecessary re-renders
     const chartOptions = useMemo<ApexOptions>(() => {
@@ -191,7 +194,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
                 mode: isDarkMode ? 'dark' : 'light',
             },
             title: {
-                text: currencyPair?.symbol ? `${currencyPair.symbol} (${timeframe})` : `Chart (${timeframe})`,
+                text: pairSymbol ? `${pairSymbol} (${timeframe})` : `Chart (${timeframe})`,
                 align: 'left',
             },
             xaxis: {
@@ -275,7 +278,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
                 width: 2,
             },
         };
-    }, [currencyPair?.symbol, timeframe, isDarkMode, pipDigits]);
+    }, [pairSymbol, timeframe, isDarkMode, pipDigits]);
 
     const allSeries = useMemo(() => {
         const series = [];
@@ -299,7 +302,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
         <div className="w-full h-full p-2 bg-card text-card-foreground rounded-lg">
             <div className="flex justify-between items-center mb-2">
                 <h2 className="text-lg font-semibold">
-                    {currencyPair?.symbol ? `${currencyPair.symbol} (${timeframe})` : 'Loading Chart...'}
+                    {pairSymbol ? `${pairSymbol} (${timeframe})` : 'Loading Chart...'}
                 </h2>
             </div>
 
@@ -316,7 +319,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
             ) : (
                 <div className="chart-candlestick overflow-hidden pb-5">
                     <ReactApexChart
-                        key={`${pairId}-${timeframe}`}
+                        key={`${pairSymbol}-${timeframe}`}
                         options={chartOptions}
                         series={allSeries}
                         type="candlestick"

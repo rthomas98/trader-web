@@ -47,6 +47,7 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
         Route::get('/', [TradingController::class, 'index'])->name('index');
         Route::get('/historical-data', [TradingController::class, 'getHistoricalData'])->name('historical-data');
         Route::get('/predictive-data', [TradingController::class, 'getPredictiveData'])->name('predictive-data');
+        Route::get('/chart-data', [TradingController::class, 'getChartData'])->name('chart-data');
         Route::post('/positions', [TradingController::class, 'storePosition'])->name('positions.store');
         Route::post('/positions/{position}/close', [TradingController::class, 'closePosition'])->name('positions.close');
         Route::post('/toggle-mode', [TradingController::class, 'toggleTradingMode'])->name('toggle-mode');

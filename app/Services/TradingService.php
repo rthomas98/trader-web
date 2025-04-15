@@ -32,7 +32,7 @@ class TradingService
         // Start a database transaction
         return DB::transaction(function () use ($user, $orderData) {
             // Get the current price for the currency pair
-            $currentPrice = $this->marketDataService->getCurrentPrice($orderData['currency_pair']);
+            $currentPrice = $this->getCurrentPrice($orderData['currency_pair']);
             
             // Calculate the required margin
             $requiredMargin = $this->calculateRequiredMargin(
@@ -107,7 +107,7 @@ class TradingService
             }
             
             // Get the current price for the currency pair
-            $currentPrice = $this->marketDataService->getCurrentPrice($position->currency_pair);
+            $currentPrice = $this->getCurrentPrice($position->currency_pair);
             
             // Calculate profit/loss
             $profitLoss = $this->marketDataService->calculateProfitLoss(
@@ -181,7 +181,7 @@ class TradingService
             return false;
         }
         
-        $currentPrice = $this->marketDataService->getCurrentPrice($position->currency_pair);
+        $currentPrice = $this->getCurrentPrice($position->currency_pair);
         
         // Check stop loss
         if ($position->stop_loss && $position->trade_type === 'BUY' && $currentPrice <= $position->stop_loss) {
@@ -298,5 +298,17 @@ class TradingService
                 ['id' => 30, 'symbol' => 'DE40/EUR'],
             ],
         ];
+    }
+    
+    /**
+     * Get the current market price for a currency pair.
+     *
+     * @param string $currencyPair
+     * @return float|null Returns the price as a float, or null if not found.
+     */
+    public function getCurrentPrice(string $currencyPair): ?float
+    {
+        // Delegate the call to the market data service
+        return $this->marketDataService->getCurrentPrice($currencyPair);
     }
 }
