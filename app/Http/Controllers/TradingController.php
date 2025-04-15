@@ -337,20 +337,6 @@ class TradingController extends Controller
     }
     
     /**
-     * Get symbol details.
-     */
-    public function getSymbolDetails(Request $request)
-    {
-        $validated = $request->validate([
-            'symbol' => 'required|string|max:20',
-        ]);
-        
-        $details = $this->marketDataService->getSymbolDetails($validated['symbol']);
-        
-        return response()->json($details);
-    }
-
-    /**
      * Get user's trading orders.
      */
     public function getOrders(Request $request)
@@ -606,6 +592,252 @@ class TradingController extends Controller
             'success' => true,
             'data' => $predictiveData,
         ]);
+    }
+    
+    /**
+     * Get historical price data for a currency pair.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getHistoricalData(Request $request)
+    {
+        $request->validate([
+            'currency_pair' => 'required|string|max:20',
+            'timeframe' => 'required|string|in:1m,5m,15m,30m,1h,4h,1d,1w', // Adjust valid timeframes as needed
+            'count' => 'sometimes|integer|min:10|max:1000', // Optional count, adjust max as needed
+        ]);
+
+        $pair = $request->input('currency_pair');
+        $timeframe = $request->input('timeframe');
+        $count = $request->input('count', 200); // Default count if not provided
+
+        try {
+            $historicalData = $this->marketDataService->getHistoricalPriceData($pair, $count, $timeframe);
+
+            if (empty($historicalData)) {
+                return response()->json(['success' => false, 'message' => 'No historical data found for the specified parameters.'], 404);
+            }
+
+            return response()->json($historicalData); // Return the array directly as requested by frontend
+
+        } catch (\Exception $e) {
+            
+            // Log the error for debugging
+            \Illuminate\Support\Facades\Log::error('Error fetching historical data', [
+                'pair' => $pair,
+                'timeframe' => $timeframe,
+                'count' => $count,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve historical data. ' . $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Get currency pair details by ID.
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getCurrencyPair(int $id)
+    {
+        try {
+            // Get all available currency pairs
+            $availablePairs = $this->tradingService->getAvailableCurrencyPairs();
+            
+            // Find the pair with the matching ID
+            $pair = null;
+            foreach (['forex', 'crypto', 'commodities', 'indices'] as $type) {
+                if (isset($availablePairs[$type])) {
+                    foreach ($availablePairs[$type] as $index => $pairData) {
+                        if (isset($pairData['id']) && $pairData['id'] == $id) {
+                            $pair = $pairData;
+                            $pair['type'] = $type;
+                            break 2;
+                        }
+                    }
+                }
+            }
+            
+            if (!$pair) {
+                return response()->json(['success' => false, 'message' => 'Currency pair not found'], 404);
+            }
+            
+            return response()->json($pair);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error fetching currency pair', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve currency pair details: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Get current price by currency pair ID.
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getCurrentPriceById(int $id)
+    {
+        try {
+            // Get all available currency pairs
+            $availablePairs = $this->tradingService->getAvailableCurrencyPairs();
+            
+            // Find the pair with the matching ID
+            $pairSymbol = null;
+            foreach (['forex', 'crypto', 'commodities', 'indices'] as $type) {
+                if (isset($availablePairs[$type])) {
+                    foreach ($availablePairs[$type] as $index => $pairData) {
+                        if (isset($pairData['id']) && $pairData['id'] == $id) {
+                            $pairSymbol = $pairData['symbol'];
+                            break 2;
+                        }
+                    }
+                }
+            }
+            
+            if (!$pairSymbol) {
+                return response()->json(['success' => false, 'message' => 'Currency pair not found'], 404);
+            }
+            
+            $price = $this->marketDataService->getCurrentPrice($pairSymbol);
+            
+            return response()->json([
+                'success' => true,
+                'current' => [
+                    'id' => $id,
+                    'symbol' => $pairSymbol,
+                    'price' => $price,
+                    'timestamp' => now()->timestamp
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error fetching current price', [
+                'id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve current price: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Get historical data by currency pair ID.
+     *
+     * @param int $id
+     * @param string $timeframe
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getHistoricalDataById(int $id, string $timeframe)
+    {
+        try {
+            // Get all available currency pairs
+            $availablePairs = $this->tradingService->getAvailableCurrencyPairs();
+            
+            // Find the pair with the matching ID
+            $pairSymbol = null;
+            foreach (['forex', 'crypto', 'commodities', 'indices'] as $type) {
+                if (isset($availablePairs[$type])) {
+                    foreach ($availablePairs[$type] as $index => $pairData) {
+                        if (isset($pairData['id']) && $pairData['id'] == $id) {
+                            $pairSymbol = $pairData['symbol'];
+                            break 2;
+                        }
+                    }
+                }
+            }
+            
+            if (!$pairSymbol) {
+                return response()->json(['success' => false, 'message' => 'Currency pair not found'], 404);
+            }
+            
+            // Validate timeframe
+            $validTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'];
+            if (!in_array($timeframe, $validTimeframes)) {
+                return response()->json(['success' => false, 'message' => 'Invalid timeframe'], 422);
+            }
+            
+            $count = 200; // Default count
+            $historicalData = $this->marketDataService->getHistoricalPriceData($pairSymbol, $count, $timeframe);
+            
+            return response()->json($historicalData);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error fetching historical data', [
+                'id' => $id,
+                'timeframe' => $timeframe,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve historical data: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * Get predictive data by currency pair ID.
+     *
+     * @param int $id
+     * @param string $timeframe
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPredictiveDataById(int $id, string $timeframe)
+    {
+        try {
+            // Get all available currency pairs
+            $availablePairs = $this->tradingService->getAvailableCurrencyPairs();
+            
+            // Find the pair with the matching ID
+            $pairSymbol = null;
+            foreach (['forex', 'crypto', 'commodities', 'indices'] as $type) {
+                if (isset($availablePairs[$type])) {
+                    foreach ($availablePairs[$type] as $index => $pairData) {
+                        if (isset($pairData['id']) && $pairData['id'] == $id) {
+                            $pairSymbol = $pairData['symbol'];
+                            break 2;
+                        }
+                    }
+                }
+            }
+            
+            if (!$pairSymbol) {
+                return response()->json(['success' => false, 'message' => 'Currency pair not found'], 404);
+            }
+            
+            // Validate timeframe
+            $validTimeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'];
+            if (!in_array($timeframe, $validTimeframes)) {
+                return response()->json(['success' => false, 'message' => 'Invalid timeframe'], 422);
+            }
+            
+            // First, get historical data
+            $count = 30; // Use less data for prediction
+            $historicalData = $this->marketDataService->getHistoricalPriceData($pairSymbol, $count, $timeframe);
+            
+            // Then generate predictive data based on historical data
+            $predictiveData = $this->marketDataService->generatePredictiveData($historicalData['historical'], $pairSymbol, $timeframe);
+            
+            return response()->json([
+                'success' => true,
+                'predictive' => $predictiveData
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error fetching predictive data', [
+                'id' => $id,
+                'timeframe' => $timeframe,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json(['success' => false, 'message' => 'Failed to retrieve predictive data: ' . $e->getMessage()], 500);
+        }
     }
     
     /**

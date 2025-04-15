@@ -387,7 +387,11 @@ class MarketDataService
         $volatilityFactor = min(max($volatility * 100, 0.5), 2.0);
         
         // Determine strength based on MACD
-        $strengthFactor = abs($macd['macd'] - $macd['signal']) / $closePrices[count($closePrices) - 1] * 1000;
+        $closePricesCount = count($closePrices);
+        $lastClosePrice = $closePricesCount > 0 ? $closePrices[$closePricesCount - 1] : 1; // Use 1 as default if empty
+        
+        // Avoid division by zero and calculate strength factor
+        $strengthFactor = $lastClosePrice != 0 ? abs($macd['macd'] - $macd['signal']) / $lastClosePrice * 1000 : 0;
         $strengthFactor = min(max($strengthFactor, 0.1), 1.5);
         
         // Determine reversal potential based on Bollinger Bands
@@ -401,10 +405,21 @@ class MarketDataService
         }
         
         $reversalFactor = min(max($reversalFactor, -1), 1);
-        
         // Generate predictive data
         $predictiveData = [];
+        
+        // Check if historical data exists and has at least one point
+        if (empty($historicalData)) {
+            return $predictiveData; // Return empty array if no historical data
+        }
+        
         $lastHistoricalPoint = end($historicalData);
+        
+        // Check if the last historical point has the required keys
+        if (!isset($lastHistoricalPoint['timestamp']) || !isset($lastHistoricalPoint['close'])) {
+            return $predictiveData; // Return empty array if missing required keys
+        }
+        
         $lastTimestamp = $lastHistoricalPoint['timestamp'];
         $lastClose = $lastHistoricalPoint['close'];
         

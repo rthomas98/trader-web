@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\TradingController;
+use App\Http\Controllers\MarketDataController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,12 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 // Public Trading API Routes
 Route::get('/trading/current-price', [TradingController::class, 'getCurrentPrice']);
 Route::get('/trading/chart-data', [TradingController::class, 'getChartData']);
+
+// New API Routes for Currency Pairs and Market Data
+Route::get('/currency-pairs/{id}', [TradingController::class, 'getCurrencyPair']);
+Route::get('/market-data/current/{id}', [TradingController::class, 'getCurrentPriceById']);
+Route::get('/market-data/historical/{id}/{timeframe}', [TradingController::class, 'getHistoricalDataById']);
+Route::get('/market-data/predictive/{id}/{timeframe}', [TradingController::class, 'getPredictiveDataById']);
 
 // Protected Trading API Routes
 Route::middleware('auth:sanctum')->group(function () {

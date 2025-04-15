@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import AppLayout from '../../layouts/app-layout';
+import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
 import { 
   Table, 
   TableHeader, 
@@ -11,7 +11,7 @@ import {
   TableHead, 
   TableBody, 
   TableCell 
-} from '@/components/ui/table';
+} from '../../components/ui/table';
 import { 
   Dialog, 
   DialogContent, 
@@ -19,21 +19,21 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogFooter 
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '../../components/ui/dialog';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
 import { 
   Select, 
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
   SelectValue 
-} from '@/components/ui/select';
-import { useAppearance } from '@/hooks/use-appearance';
-import { Switch } from '@/components/ui/switch';
-import { useToast } from "@/components/ui/use-toast";
-import TradingChart from '@/components/trading/trading-chart';
-import { Loader2 } from 'lucide-react';
+} from '../../components/ui/select';
+import { useAppearance } from '../../hooks/use-appearance';
+import { Switch } from '../../components/ui/switch';
+import { useToast } from "../../components/ui/use-toast";
+import TradingChart from '../../components/trading/trading-chart';
+import { CurrencyPair } from '../../types/currency-pair'; // Use relative path
 
 // Define types for our data
 interface Position {
@@ -86,10 +86,10 @@ interface MarketOverview {
 }
 
 interface AvailablePairs {
-  forex: string[];
-  crypto: string[];
-  commodities: string[];
-  indices: string[];
+  forex: { id: number; symbol: string }[];
+  crypto: { id: number; symbol: string }[];
+  commodities: { id: number; symbol: string }[];
+  indices: { id: number; symbol: string }[];
 }
 
 interface TradingProps {
@@ -118,8 +118,17 @@ interface PositionFormData {
 
 interface CandleData {
   x: Date;
-  y: number[]; // [open, high, low, close, volume (optional)]
+  y: [number, number, number, number]; // [open, high, low, close]
   pair?: string;
+}
+
+interface HistoricalDataItem {
+  timestamp: number; // Changed from date: string
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number; // Volume might be optional
 }
 
 // Format currency helper function
@@ -156,106 +165,111 @@ const Trading = ({
     take_profit: null,
   });
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1h');
-  const [selectedPair, setSelectedPair] = useState('EUR/USD');
+  const [selectedPair, setSelectedPair] = useState<string>(''); // Start empty string
+  const [details, setDetails] = useState<CurrencyPair | null>(null); // Initialize details to null
   const [predictiveMode, setPredictiveMode] = useState(false);
-  const [isPredictionLoading, setIsPredictionLoading] = useState(false); // State for prediction loading
-  const [predictionError, setPredictionError] = useState<string | null>(null); // State for prediction error
   
   const { appearance } = useAppearance();
   const { toast } = useToast();
   
-  // Fetch current prices
+  // Helper function to generate fallback prices (extracted logic)
+  const generateFallbackPrices = useCallback(() => {
+    console.log('Generating fallback/mock prices.');
+    const fallbackPrices: Record<string, CurrentPrice> = {};
+    const basePrices: Record<string, number> = {
+      'EUR/USD': 1.0876,
+      'USD/JPY': 151.62,
+      'GBP/USD': 1.2542,
+      'USD/CHF': 0.9042,
+      'AUD/USD': 0.6614,
+      'USD/CAD': 1.3614,
+      'NZD/USD': 0.6014,
+    };
+
+    const basePrice = basePrices[selectedPair] || 1.0;
+    const randomVariation = (Math.random() * 0.02) - 0.01;
+    fallbackPrices[selectedPair] = {
+      price: basePrice * (1 + randomVariation),
+      timestamp: new Date().toISOString()
+    };
+
+    localPositions.forEach(position => {
+      if (!fallbackPrices[position.currency_pair]) {
+        const posBasePrice = basePrices[position.currency_pair] || position.open_price || 1.0;
+        const posRandomVariation = (Math.random() * 0.02) - 0.01;
+        fallbackPrices[position.currency_pair] = {
+          price: posBasePrice * (1 + posRandomVariation),
+          timestamp: new Date().toISOString()
+        };
+      }
+    });
+    setCurrentPrices(fallbackPrices);
+  }, [selectedPair, localPositions]); // Dependencies for generateFallbackPrices
+
+  // Fetch current prices function
   const fetchCurrentPrices = useCallback(async () => {
+    // Only fetch if a pair is selected
+    if (!selectedPair) {
+      console.log('No pair selected, skipping price fetch');
+      return;
+    }
+    
     try {
-      const response = await axios.get('/trading/chart-data', {
-        params: {
-          currency_pair: selectedPair,
-          timeframe: selectedTimeframe
-        }
-      });
-      if (response.data) {
-        setCurrentPrices(response.data);
+      // Use the selectedPair ID directly (not as part of a path segment)
+      const response = await axios.get(`/api/market-data/current/${selectedPair}`);
+      
+      if (response.data && response.data.current) {
+        // Process current price data
+        setCurrentPrices(response.data.current);
+      } else {
+        console.warn('Invalid response format for current prices');
       }
     } catch (error) {
       console.error('Failed to fetch current prices:', error);
-      
-      // Fallback: Generate mock data for the chart when the API fails
-      const fallbackPrices: Record<string, CurrentPrice> = {};
-      
-      // Base prices for common currency pairs
-      const basePrices: Record<string, number> = {
-        'EUR/USD': 1.0876,
-        'USD/JPY': 151.62,
-        'GBP/USD': 1.2542,
-        'USD/CHF': 0.9042,
-        'AUD/USD': 0.6614,
-        'USD/CAD': 1.3614,
-        'NZD/USD': 0.6014,
-      };
-      
-      // Create fallback data for the selected pair
-      const basePrice = basePrices[selectedPair] || 1.0;
-      // Add a small random variation to simulate market movement
-      const randomVariation = (Math.random() * 0.02) - 0.01; // -1% to +1%
-      fallbackPrices[selectedPair] = {
-        price: basePrice * (1 + randomVariation),
-        timestamp: new Date().toISOString()
-      };
-      
-      // Also ensure we have prices for all positions
-      localPositions.forEach(position => {
-        if (!fallbackPrices[position.currency_pair]) {
-          const posBasePrice = basePrices[position.currency_pair] || position.open_price || 1.0;
-          const posRandomVariation = (Math.random() * 0.02) - 0.01;
-          fallbackPrices[position.currency_pair] = {
-            price: posBasePrice * (1 + posRandomVariation),
-            timestamp: new Date().toISOString()
-          };
-        }
-      });
-      
-      setCurrentPrices(fallbackPrices);
+      // Generate fallback prices only if needed
+      console.log('Generating fallback/mock prices.');
+      generateFallbackPrices();
     }
-  }, [selectedPair, selectedTimeframe, localPositions]);
-  
+  }, [selectedPair, generateFallbackPrices]); // Add selectedPair and generateFallbackPrices as dependencies
+
   // Set up axios defaults and initialize
   useEffect(() => {
-    // Configure axios for Laravel Sanctum
     axios.defaults.withCredentials = true;
     axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
     
-    // Get the CSRF token from the meta tag and set it as a default header
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    
     if (csrfToken) {
       axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken;
     } else {
       console.warn('CSRF token not found in meta tags');
     }
     
-    // Initialize CSRF protection for Sanctum
     const initCsrf = async () => {
       try {
-        // This endpoint sets the CSRF cookie
         await axios.get('/sanctum/csrf-cookie');
         console.log('CSRF cookie initialized successfully');
         
-        // Now fetch current prices
-        fetchCurrentPrices();
+        // Only fetch prices if a pair is selected
+        if (selectedPair) {
+          fetchCurrentPrices();
+        }
       } catch (error) {
-        console.error('Error initializing CSRF protection:', error);
-        // Try to fetch prices anyway
-        fetchCurrentPrices();
+        console.error('Error initializing CSRF:', error);
       }
     };
     
-    // Initialize CSRF protection
     initCsrf();
     
-    // Set up interval for fetching prices
-    const interval = setInterval(fetchCurrentPrices, 60000); // Update every minute
+    // Set up interval but only fetch if selectedPair exists
+    const interval = setInterval(() => {
+      if (selectedPair) {
+        fetchCurrentPrices();
+      }
+    }, 60000); // Update every minute
     
     return () => clearInterval(interval);
-  }, [fetchCurrentPrices]);
+  }, [fetchCurrentPrices, selectedPair]); // Add selectedPair as dependency
   
   // Update chart when pair, timeframe, or appearance changes
   const updateChart = useCallback(() => {
@@ -287,7 +301,6 @@ const Trading = ({
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
-    // Handle different field types appropriately
     if (name === 'stop_loss' || name === 'take_profit') {
       setFormData({
         ...formData,
@@ -323,7 +336,6 @@ const Trading = ({
   const handleAddPositionSubmit = async () => {
     setIsLoading(true);
     try {
-      // Use Inertia router for form submission to maintain authentication state
       router.post('/trading', {
         currency_pair: formData.currency_pair,
         order_type: 'MARKET',
@@ -335,10 +347,8 @@ const Trading = ({
         time_in_force: 'GTC',
       }, {
         onSuccess: () => {
-          // Fetch the updated positions
           fetchPositions();
           
-          // Reset form and close modal with proper focus management
           closeAddPositionDialog();
           setFormData({
             currency_pair: '',
@@ -361,7 +371,6 @@ const Trading = ({
     }
   };
   
-  // Function to fetch positions
   const fetchPositions = async () => {
     try {
       const response = await axios.get('/trading');
@@ -378,10 +387,8 @@ const Trading = ({
     
     setIsLoading(true);
     try {
-      // Use Inertia router for form submission to maintain authentication state
       router.post(`/trading/positions/${selectedPosition.id}/close`, {}, {
         onSuccess: () => {
-          // Remove the closed position from local state
           setLocalPositions(localPositions.filter(p => p.id !== selectedPosition.id));
           closeClosePositionDialog();
           setSelectedPosition(null);
@@ -400,7 +407,6 @@ const Trading = ({
   };
 
   const closeAddPositionDialog = () => {
-    // Ensure we clear focus before closing the dialog
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
@@ -408,27 +414,22 @@ const Trading = ({
   };
 
   const closeClosePositionDialog = () => {
-    // Ensure we clear focus before closing the dialog
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
     setIsClosePositionOpen(false);
   };
 
-  // Function to toggle between demo and live trading modes
   const toggleTradingMode = async () => {
     try {
       const response = await axios.post('/trading/toggle-mode');
       
       if (response.data.success) {
-        // Update the account information with the new mode
-        // Since we can't use setAccount, we'll reload the page to get the updated account info
         toast({
           title: "Success",
           description: "Trading mode updated successfully"
         });
         
-        // Reload the page to get the updated account info
         setTimeout(() => {
           router.reload();
         }, 1500);
@@ -449,67 +450,106 @@ const Trading = ({
     }
   };
 
-  // Helper function (needed by fetchHistoricalData)
-  const getTimeframeInMs = (tf: string): number => {
-    switch (tf) {
-      case '1m': return 1 * 60 * 1000;
-      case '5m': return 5 * 60 * 1000;
-      case '15m': return 15 * 60 * 1000;
-      case '30m': return 30 * 60 * 1000;
-      case '1h': return 60 * 60 * 1000;
-      case '4h': return 4 * 60 * 60 * 1000;
-      case '1d': return 24 * 60 * 60 * 1000;
-      case '1w': return 7 * 24 * 60 * 60 * 1000;
-      default: return 60 * 60 * 1000; // Default to 1 hour
-    }
-  };
+  const fetchHistoricalData = useCallback(async (pairId: number, timeframe: string, count: number = 200): Promise<CandleData[]> => {
+    console.log('[TradingPage] fetchHistoricalData called with:', { pairId, timeframe }); // <-- Log entry & params
+    console.log('[TradingPage] Attempting axios.get for historical data...'); // <-- Log before axios call
+    try {
+      // Ensure CSRF token is initialized before making the request
+      await axios.get('/sanctum/csrf-cookie');
 
-  // Define fetchHistoricalData function
-  const fetchHistoricalData = async (pairId: string, timeframe: string, count: number = 200): Promise<CandleData[]> => {
-    console.log(`Fetching data for ${pairId}, timeframe: ${timeframe}, count: ${count}`);
-    // In a real app, fetch data from an API endpoint
-    // For now, generate mock data:
-    const data: CandleData[] = [];
-    let lastClose = 1.10000 + (Math.random() - 0.5) * 0.1; // Start with some variation
-    const timeframeMs = getTimeframeInMs(timeframe); // Use the helper
-    let currentTime = new Date().getTime() - count * timeframeMs;
-
-    for (let i = 0; i < count; i++) {
-      const open = lastClose;
-      const high = open + Math.random() * 0.00100;
-      const low = open - Math.random() * 0.00100;
-      const close = low + Math.random() * (high - low);
-      const volume = Math.random() * 10000 + 5000;
-      data.push({
-        x: new Date(currentTime),
-        y: [open, high, low, close, volume], // Ensure volume is included if needed
-        pair: pairId
+      const response = await axios.get('/trading/historical-data', {
+        params: {
+          currency_pair: pairId,
+          timeframe: timeframe,
+          count: count
+        }
       });
-      lastClose = close;
-      currentTime += timeframeMs;
-    }
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    console.log(`Returning ${data.length} data points.`);
-    return data;
-  };
 
-  // Handlers for prediction state changes from TradingChart
-  const handlePredictionLoadingChange = useCallback((isLoading: boolean) => {
-    setIsPredictionLoading(isLoading);
-  }, []);
+      console.log('Raw API Historical Data:', response.data); // <-- Log raw data
 
-  const handlePredictionError = useCallback((error: string | null) => {
-    setPredictionError(error);
-    if (error) {
+      // Adjust to handle the new response structure { historical: [], predictive: {} }
+      if (response.data && response.data.historical && Array.isArray(response.data.historical)) {
+        // Transform the historical data array
+        const historicalData = response.data.historical;
+        const transformedData: CandleData[] = historicalData.map((item: HistoricalDataItem) => ({
+          x: new Date(item.timestamp), // Use item.timestamp directly
+          y: [
+            item.open,
+            item.high,
+            item.low,
+            item.close
+          ] as [number, number, number, number], // Ensure it's a 4-element tuple
+          pair: pairId
+        }));
+        console.log(`Received and transformed ${transformedData.length} data points.`);
+        return transformedData;
+      } else {
+        console.error('Invalid data format received from API:', response.data);
+        toast({
+          title: "Chart Error",
+          description: "Received invalid data format for chart. Expected { historical: [...] }.",
+          variant: "destructive",
+        });
+        return []; // Return empty array if data is not as expected
+      }
+    } catch (error: unknown) { // Changed from any to unknown
+      console.error('Error fetching historical data:', error);
+      let errorMessage = "Could not fetch chart data.";
+
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          // Server responded with a status code outside the 2xx range
+          console.error('API Error Response:', error.response.data);
+          errorMessage = error.response.data?.message || `Server error: ${error.response.status}`;
+        } else if (error.request) {
+          // Request was made but no response received
+          console.error('API No Response:', error.request);
+          errorMessage = "No response from server. Check network connection.";
+        } else {
+          // Something happened in setting up the request
+          console.error('API Request Setup Error:', error.message);
+          errorMessage = `Error setting up request: ${error.message}`;
+        }
+      } else if (error instanceof Error) {
+        // Handle non-Axios errors (e.g., errors during data transformation)
+        console.error('Non-API Error:', error);
+        errorMessage = error.message || 'An unexpected error occurred.';
+      } else {
+        console.error('Unknown Error:', error);
+        errorMessage = 'An unknown error occurred.';
+      }
+
       toast({
-        title: "Prediction Error",
-        description: error,
+        title: "Chart Data Error",
+        description: errorMessage,
         variant: "destructive",
       });
+      return []; // Return empty array on error
     }
-  }, [toast]);
+  }, [toast]); // Added toast dependency
 
+  useEffect(() => {
+    if (selectedPair) {
+      const fetchDetails = async () => {
+        try {
+          // Use the selectedPair ID directly (not as part of a path segment)
+          const response = await axios.get(`/api/currency-pairs/${selectedPair}`);
+          setDetails(response.data); // <-- Call setDetails here
+        } catch (error: unknown) { // <-- Use unknown
+          console.error(`Error fetching details for pair ${selectedPair}:`, error);
+          setDetails(null); // Reset details on error
+          // Add toast notification for fetch details error
+          toast({
+            title: "Error",
+            description: `Failed to fetch details: ${error instanceof Error ? error.message : 'Unknown error'}`, // <-- Type check
+            variant: "destructive",
+          });
+        }
+      };
+      fetchDetails();
+    }
+  }, [selectedPair, toast]); // <-- Added toast dependency
+ 
   return (
     <AppLayout>
       <Head title="Trading">
@@ -585,10 +625,10 @@ const Trading = ({
           </Card>
         </div>
         
-        {/* Trading Chart Card - Full width with negative margins */}
-        <div>
-          <Card className="w-full">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Trading Chart Card */}
+          <Card className="md:col-span-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Trading Chart</CardTitle>
               <div className="flex space-x-2">
                 <Select 
@@ -601,12 +641,10 @@ const Trading = ({
                     <SelectValue placeholder="Select pair" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(availablePairs).map(([type, pairs], typeIndex: number) => (
-                      <React.Fragment key={`type-${type}-${typeIndex}`}>
-                        {pairs.map((pair: string, pairIndex: number) => (
-                          <SelectItem key={`${type}-${pair}-${pairIndex}`} value={pair}>{pair}</SelectItem>
-                        ))}
-                      </React.Fragment>
+                    {availablePairs && availablePairs.crypto && availablePairs.crypto.map((pair) => (
+                      <SelectItem key={pair.id} value={String(pair.id)}>
+                        {pair.symbol}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -638,34 +676,36 @@ const Trading = ({
                       Predictive Mode
                     </span>
                   </Label>
-                  <Switch 
-                    id="predictive-mode"
-                    checked={predictiveMode} 
-                    onCheckedChange={setPredictiveMode} 
-                    disabled={isPredictionLoading} // Disable switch while loading
-                  />
-                  {isPredictionLoading && (
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> // Show loader
-                  )}
+                  <div className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 bg-input hover:bg-accent cursor-pointer"
+                    onClick={() => setPredictiveMode(!predictiveMode)}
+                  >
+                    <span className={`${predictiveMode ? "translate-x-6 bg-purple-500" : "translate-x-1 bg-foreground"} inline-block h-4 w-4 rounded-full transition-transform`} />
+                  </div>
                 </div>
-              </div>
+            </div>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
-              <TradingChart
-                pairId={selectedPair} 
-                timeframe={selectedTimeframe}
-                predictiveMode={predictiveMode} 
-                historicalDataFn={fetchHistoricalData} 
-                onPredictionLoadingChange={handlePredictionLoadingChange} // Pass handler
-                onPredictionError={handlePredictionError} // Pass handler
-              />
+            <CardContent className="h-[500px] p-0 overflow-hidden pb-4">
+              {/* Conditionally render TradingChart */}
+              {selectedPair && details ? (
+                <TradingChart
+                  pairId={parseInt(selectedPair, 10)} // Convert string pairId to number
+                  timeframe={selectedTimeframe}
+                  currencyPair={details} // Corrected: Pass the details object
+                  historicalDataFn={fetchHistoricalData} // Pass the defined function
+                  predictiveMode={predictiveMode}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-muted-foreground">Select a currency pair to view the chart.</p>
+                  {/* Or use a Skeleton loader */}
+                  {/* <Skeleton className="w-full h-full" /> */}
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-        
-        <div>
+
           {/* Open Positions Card */}
-          <Card className="w-full"> 
+          <Card className="md:col-span-3">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Open Positions</CardTitle>
               <Button size="sm" onClick={handleAddPosition}>Add Position</Button>
@@ -881,12 +921,10 @@ const Trading = ({
                     <SelectValue placeholder="Select currency pair" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(availablePairs).map(([type, pairs], typeIndex: number) => (
-                      <React.Fragment key={`type-${type}-${typeIndex}`}>
-                        {pairs.map((pair: string, pairIndex: number) => (
-                          <SelectItem key={`${type}-${pair}-${pairIndex}`} value={pair}>{pair}</SelectItem>
-                        ))}
-                      </React.Fragment>
+                    {availablePairs && availablePairs.crypto && availablePairs.crypto.map((pair) => (
+                      <SelectItem key={pair.id} value={String(pair.id)}>
+                        {pair.symbol}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
