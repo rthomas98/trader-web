@@ -33,6 +33,7 @@ import { useAppearance } from '@/hooks/use-appearance';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from "@/components/ui/use-toast";
 import TradingChart from '@/components/trading/trading-chart';
+import { Loader2 } from 'lucide-react';
 
 // Define types for our data
 interface Position {
@@ -156,7 +157,9 @@ const Trading = ({
   });
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>('1h');
   const [selectedPair, setSelectedPair] = useState('EUR/USD');
-  const [predictiveMode, setPredictiveMode] = useState<boolean>(false);
+  const [predictiveMode, setPredictiveMode] = useState(false);
+  const [isPredictionLoading, setIsPredictionLoading] = useState(false); // State for prediction loading
+  const [predictionError, setPredictionError] = useState<string | null>(null); // State for prediction error
   
   const { appearance } = useAppearance();
   const { toast } = useToast();
@@ -491,6 +494,22 @@ const Trading = ({
     return data;
   };
 
+  // Handlers for prediction state changes from TradingChart
+  const handlePredictionLoadingChange = useCallback((isLoading: boolean) => {
+    setIsPredictionLoading(isLoading);
+  }, []);
+
+  const handlePredictionError = useCallback((error: string | null) => {
+    setPredictionError(error);
+    if (error) {
+      toast({
+        title: "Prediction Error",
+        description: error,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   return (
     <AppLayout>
       <Head title="Trading">
@@ -566,10 +585,10 @@ const Trading = ({
           </Card>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Trading Chart Card */}
-          <Card className="md:col-span-3">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        {/* Trading Chart Card - Full width with negative margins */}
+        <div>
+          <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
               <CardTitle className="text-sm font-medium">Trading Chart</CardTitle>
               <div className="flex space-x-2">
                 <Select 
@@ -619,26 +638,34 @@ const Trading = ({
                       Predictive Mode
                     </span>
                   </Label>
-                  <div className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 bg-input hover:bg-accent cursor-pointer"
-                    onClick={() => setPredictiveMode(!predictiveMode)}
-                  >
-                    <span className={`${predictiveMode ? "translate-x-6 bg-purple-500" : "translate-x-1 bg-foreground"} inline-block h-4 w-4 rounded-full transition-transform`} />
-                  </div>
+                  <Switch 
+                    id="predictive-mode"
+                    checked={predictiveMode} 
+                    onCheckedChange={setPredictiveMode} 
+                    disabled={isPredictionLoading} // Disable switch while loading
+                  />
+                  {isPredictionLoading && (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> // Show loader
+                  )}
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-            <TradingChart
-    pairId={selectedPair} // Pass selectedPair as pairId
-    timeframe={selectedTimeframe}
-    predictiveMode={predictiveMode} // Pass the predictiveMode state
-    historicalDataFn={fetchHistoricalData} // Pass the defined function
-/>
+            <CardContent className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+              <TradingChart
+                pairId={selectedPair} 
+                timeframe={selectedTimeframe}
+                predictiveMode={predictiveMode} 
+                historicalDataFn={fetchHistoricalData} 
+                onPredictionLoadingChange={handlePredictionLoadingChange} // Pass handler
+                onPredictionError={handlePredictionError} // Pass handler
+              />
             </CardContent>
           </Card>
-
+        </div>
+        
+        <div>
           {/* Open Positions Card */}
-          <Card className="md:col-span-3">
+          <Card className="w-full"> 
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Open Positions</CardTitle>
               <Button size="sm" onClick={handleAddPosition}>Add Position</Button>

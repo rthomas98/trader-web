@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import axios from 'axios'; // Import axios
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowUp, ArrowDown, Zap, Loader2 } from 'lucide-react'; // Keep imports for potential future use
 import Chart from 'react-apexcharts';
 import { ApexOptions } from 'apexcharts';
 
@@ -9,8 +9,9 @@ interface TradingChartProps {
   pairId: string;
   timeframe: string;
   predictiveMode: boolean; // Prop for simple prediction line toggle
-  predictiveEnabled?: boolean; // Keep for potential future complex predictions
   historicalDataFn: (pairId: string, timeframe: string, count?: number) => Promise<CandleData[]>; // Expect a Promise returning CandleData[]
+  onPredictionLoadingChange?: (isLoading: boolean) => void; // Callback for loading state
+  onPredictionError?: (error: string | null) => void; // Callback for error state
 }
 
 // Ensure consistent definition
@@ -31,43 +32,19 @@ interface PredictionSeriesData {
   y: number;
 }
 
-// Sample prediction data generator (can be replaced with actual logic)
-const generateSamplePredictionData = (baseData: CandleData[]): ApexAxisChartSeries => {
-  if (!baseData || baseData.length === 0) return [];
-
-  const predictionSeriesData = baseData.map((point) => {
-    if (!point || !point.x || !(point.x instanceof Date) || !Array.isArray(point.y) || point.y.length < 4) {
-      console.warn('Skipping invalid point for prediction:', point);
-      return null;
-    }
-    const closePrice = parseFloat(point.y[3].toString());
-    if (isNaN(closePrice)) {
-      console.warn('Skipping point with invalid close price for prediction:', point);
-      return null;
-    }
-    return {
-      x: point.x,
-      y: closePrice + (Math.random() * 2 - 1) * 0.0005 // Simple random offset
-    };
-  }).filter((point): point is PredictionSeriesData => point !== null);
-
-  predictionSeriesData.sort((a, b) => a.x.getTime() - b.x.getTime());
-
-  return [{
-    name: 'Prediction (Simulated)',
-    type: 'line',
-    data: predictionSeriesData,
-    color: '#211DE4' // Example color
-  }];
-};
-
+// Define Prediction API data type
+interface PredictiveApiDataPoint {
+  timestamp: number; // Expecting milliseconds timestamp from backend
+  price: number;
+}
 
 const TradingChart: React.FC<TradingChartProps> = ({
   pairId,
   timeframe,
   predictiveMode,
-  // predictiveEnabled = false, // Keep if needed for future logic
-  historicalDataFn // Now required and used
+  historicalDataFn, // Now required and used
+  onPredictionLoadingChange,
+  onPredictionError
 }) => {
   const [isClient, setIsClient] = useState(false);
   const [candleData, setCandleData] = useState<CandleData[]>([]);
@@ -110,79 +87,104 @@ const TradingChart: React.FC<TradingChartProps> = ({
       setError(null); // Clear previous errors
       setCandleData([]); // Clear old data
       setVolumeData([]);
-      setPredictionSeries([]);
+      setPredictionSeries([]); // Clear old predictions
 
       try {
-        const data = await historicalDataFn(pairId, timeframe, 200); // Use the prop function
+        // Fetch historical data (always needed)
+        const historicalData = await historicalDataFn(pairId, timeframe, 200); // Use the prop function
 
-        if (!data || data.length === 0) {
-          console.warn(`No historical data received for ${pairId} (${timeframe}).`);
-          setLoading(false);
-          setError(`No data available for ${pairId} (${timeframe}).`);
-          return;
+        if (!historicalData || historicalData.length === 0) {
+          throw new Error("No historical data received.");
         }
 
-        // Ensure data is properly formatted (x should be Date, y should have >= 4 numbers)
-        const fetchedCandles: CandleData[] = data
-          .map(d => {
-            // Ensure x is a Date object; handle potential string/number dates
-            let dateObj: Date | null = null;
-            if (d.x instanceof Date) {
-                dateObj = d.x;
-            } else if (typeof d.x === 'string' || typeof d.x === 'number') {
-                dateObj = new Date(d.x);
+        // Process historical data
+        const processedCandleData: CandleData[] = [];
+        const processedVolumeData: VolumeData[] = [];
+
+        historicalData.forEach(point => {
+          if (point && point.x && point.y && Array.isArray(point.y) && point.y.length >= 4) {
+            const date = new Date(point.x); // Ensure x is a Date object
+            if (!isNaN(date.getTime())) {
+              processedCandleData.push({ x: date, y: point.y.slice(0, 4) });
+              // Assume volume is the 5th element if present, otherwise use 0
+              const volume = point.y.length >= 5 && typeof point.y[4] === 'number' ? point.y[4] : 0;
+              processedVolumeData.push({ x: date, y: volume });
+            } else {
+              console.warn("Skipping invalid date in historical data:", point.x);
             }
-            // Validate y array structure
-            if (dateObj && !isNaN(dateObj.getTime()) && Array.isArray(d.y) && d.y.length >= 4 && d.y.slice(0, 4).every(val => typeof val === 'number' && !isNaN(val))) {
-              return {
-                  ...d,
-                  x: dateObj,
-                  y: d.y // Keep original y array
-              };
+          } else {
+            console.warn("Skipping invalid historical data point:", point);
+          }
+        });
+        
+        // Sort data just in case it's not
+        processedCandleData.sort((a, b) => a.x.getTime() - b.x.getTime());
+        processedVolumeData.sort((a, b) => a.x.getTime() - b.x.getTime());
+
+        if (processedCandleData.length === 0) {
+          throw new Error("No valid historical data points found after processing.");
+        }
+
+        setCandleData(processedCandleData);
+        setVolumeData(processedVolumeData);
+
+        // Fetch predictive data only if predictiveMode is true
+        if (predictiveMode) {
+          try {
+            const predictiveResponse = await axios.get('/trading/predictive-data', {
+              params: {
+                pair: pairId,
+                timeframe: timeframe,
+                count: 200 // Match historical count for context
+              }
+            });
+            
+            if (predictiveResponse.data && predictiveResponse.data.success && Array.isArray(predictiveResponse.data.data)) {
+                const rawPredictiveData: PredictiveApiDataPoint[] = predictiveResponse.data.data;
+                
+                const processedPredictiveData = rawPredictiveData
+                    .map(p => {
+                        const date = new Date(p.timestamp); // Convert timestamp to Date
+                        return !isNaN(date.getTime()) && typeof p.price === 'number' 
+                            ? { x: date, y: p.price } 
+                            : null;
+                    })
+                    .filter((p): p is PredictionSeriesData => p !== null);
+
+                processedPredictiveData.sort((a, b) => a.x.getTime() - b.x.getTime());
+
+                setPredictionSeries([
+                  {
+                    name: 'Prediction',
+                    type: 'line',
+                    data: processedPredictiveData,
+                    color: '#211DE4', // Brand blue
+                  }
+                ]);
+            } else {
+                console.warn('Predictive data fetch failed or returned invalid format:', predictiveResponse.data);
+                setError('Failed to load predictive data.'); // Set error but don't stop rendering historical
             }
-            console.warn("Filtering invalid data point:", d);
-            return null; // Mark invalid points for filtering
-          })
-          .filter((d): d is CandleData => d !== null) // Filter out nulls (invalid points)
-          .sort((a, b) => a.x.getTime() - b.x.getTime()); // Ensure sorted by date
-
-        if (fetchedCandles.length === 0) {
-            console.warn(`No valid data points after filtering for ${pairId} (${timeframe}).`);
-            setError(`No valid data points found for ${pairId} (${timeframe}).`);
-            setLoading(false);
-            return;
+          } catch (predictiveError: unknown) { // Type the caught error
+             console.error('Error fetching predictive data:', predictiveError);
+             setError('Error loading predictive data.'); // Set error but don't stop rendering historical
+          }
         }
 
-        const fetchedVolumes: VolumeData[] = fetchedCandles.map(d => ({
-          x: d.x,
-          // Ensure volume (5th element, index 4) exists and is a number, default to 0
-          y: (Array.isArray(d.y) && typeof d.y[4] === 'number' && !isNaN(d.y[4])) ? d.y[4] : 0
-        }));
-
-        setCandleData(fetchedCandles);
-        setVolumeData(fetchedVolumes);
-
-        // Generate predictions only if predictiveMode is on and we have valid candle data
-        if (predictiveMode && fetchedCandles.length > 0) {
-           const simPrediction = generateSamplePredictionData(fetchedCandles);
-           setPredictionSeries(simPrediction);
-        } else {
-            setPredictionSeries([]); // Clear predictions if mode is off or no data
-        }
-
-      } catch (fetchError: any) {
-        console.error('Error fetching historical data:', fetchError);
-        setError(`Failed to fetch data: ${fetchError.message || 'Unknown error'}`);
-        setCandleData([]); // Clear data on error
+      } catch (err: unknown) { // Type the caught error
+        console.error('Error fetching or processing chart data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load chart data.');
+        setCandleData([]);
         setVolumeData([]);
         setPredictionSeries([]);
       } finally {
-        setLoading(false); // Data processing finished
+        setLoading(false);
       }
     };
 
     fetchData();
-  }, [pairId, timeframe, predictiveMode, historicalDataFn]); // Dependencies for fetching
+    // Dependencies: Fetch data when pairId, timeframe, historicalDataFn, or predictiveMode changes
+  }, [pairId, timeframe, historicalDataFn, predictiveMode, onPredictionLoadingChange, onPredictionError]); 
 
   // --- Indicator Calculations (Memoized) ---
   const calculateSMA = useCallback((data: CandleData[], period: number): { x: Date, y: number }[] => {
@@ -247,26 +249,51 @@ const TradingChart: React.FC<TradingChartProps> = ({
     if (indicators.sma) {
       const smaData = calculateSMA(candleData, 20);
       if (smaData.length > 0) {
-          series.push({ name: 'SMA 20', data: smaData, type: 'line', color: '#FFA500', strokeWidth: 1 });
+          series.push({ 
+            name: 'SMA 20', 
+            data: smaData, 
+            type: 'line', 
+            color: '#FFA500' 
+          });
       }
     }
     if (indicators.ema) {
       const emaData = calculateEMA(candleData, 50);
       if (emaData.length > 0) {
-          series.push({ name: 'EMA 50', data: emaData, type: 'line', color: '#8D5EB7', strokeWidth: 1 });
+          series.push({ 
+            name: 'EMA 50', 
+            data: emaData, 
+            type: 'line', 
+            color: '#8D5EB7' 
+          });
       }
     }
     if (indicators.bollinger) {
         const { sma, upper, lower } = calculateBollingerBands(candleData, 20, 2);
         // Don't add the middle band SMA if SMA indicator is already active
         if (!indicators.sma && sma.length > 0) {
-             series.push({ name: 'BB Middle', data: sma, type: 'line', color: '#D04014', strokeWidth: 1, dashArray: 2 }); // Dashed line
+             series.push({ 
+                name: 'BB Middle', 
+                data: sma, 
+                type: 'line', 
+                color: '#D04014' 
+             }); // Dashed line
         }
         if (upper.length > 0) {
-            series.push({ name: 'BB Upper', data: upper, type: 'line', color: '#D04014', strokeWidth: 1 });
+            series.push({ 
+                name: 'BB Upper', 
+                data: upper, 
+                type: 'line', 
+                color: '#D04014' 
+            });
         }
         if (lower.length > 0) {
-            series.push({ name: 'BB Lower', data: lower, type: 'line', color: '#D04014', strokeWidth: 1 });
+            series.push({ 
+                name: 'BB Lower', 
+                data: lower, 
+                type: 'line', 
+                color: '#D04014' 
+            });
         }
     }
     return series;
@@ -276,6 +303,42 @@ const TradingChart: React.FC<TradingChartProps> = ({
   const toggleIndicator = useCallback((indicator: keyof typeof indicators) => {
     setIndicators(prev => ({ ...prev, [indicator]: !prev[indicator] }));
   }, []); // No dependencies needed
+
+  // Construct the final series array first
+  const finalSeries = useMemo(() => {
+      const series: ApexAxisChartSeries = [
+          { name: 'Candlestick', type: 'candlestick', data: candleData },
+          ...indicatorSeries,
+          ...(predictiveMode && predictionSeries.length > 0 ? predictionSeries : [])
+      ];
+      return series;
+  }, [candleData, indicatorSeries, predictiveMode, predictionSeries]);
+
+  // Dynamically generate stroke settings based on the final series array
+  const { strokeWidths, strokeDashArrays } = useMemo(() => {
+      const widths: number[] = [];
+      const dashes: number[] = [];
+      finalSeries.forEach(series => {
+          let width = 1; // Default width
+          let dash = 0; // Default solid
+
+          if (series.type === 'line') {
+              if (series.name?.startsWith('Prediction')) {
+                  width = 2;
+                  dash = 5; // Dashed for prediction
+              } else if (series.name === 'BB Middle') {
+                  dash = 2; // Dashed for BB Middle
+              }
+              // Add other specific indicator styling here if needed
+          } else if (series.type === 'candlestick') {
+              width = 1; // Ensure candlestick has appropriate width setting if needed by stroke array
+          }
+
+          widths.push(width);
+          dashes.push(dash);
+      });
+      return { strokeWidths: widths, strokeDashArrays: dashes };
+  }, [finalSeries]);
 
   // --- Chart Options (Memoized) ---
   const options: ApexOptions = useMemo(() => ({
@@ -337,33 +400,48 @@ const TradingChart: React.FC<TradingChartProps> = ({
       shared: true, // Show tooltip for all series at a point
       intersect: false, // Tooltip appears even when not directly hovering over the point/candle
       x: { format: 'dd MMM yyyy HH:mm' }, // Format date in tooltip
-      y: { // Custom formatter for combined tooltip
-        formatter: (value, { seriesIndex, dataPointIndex, w }) => {
-          const seriesName = w.globals.seriesNames[seriesIndex];
-          const decimalPlaces = pipDigits;
+      y: { 
+        formatter: (value, { dataPointIndex }: { dataPointIndex: number }) => {
+          const candle = candleData[dataPointIndex]; // Assumes candleData is synced
 
-          if (seriesName === 'Candles') {
-             // ApexCharts internals might change, use safe access
-             const candleO = w.globals.seriesCandleO?.[0]?.[dataPointIndex];
-             const candleH = w.globals.seriesCandleH?.[0]?.[dataPointIndex];
-             const candleL = w.globals.seriesCandleL?.[0]?.[dataPointIndex];
-             const candleC = w.globals.seriesCandleC?.[0]?.[dataPointIndex];
-
-             if (candleO === undefined || candleH === undefined || candleL === undefined || candleC === undefined) return '';
-             // Format the candle data
-             return `
-               <div class="apexcharts-tooltip-candlestick">
-                 <div>Open: <span style="font-weight:bold">${candleO.toFixed(decimalPlaces)}</span></div>
-                 <div>High: <span style="font-weight:bold">${candleH.toFixed(decimalPlaces)}</span></div>
-                 <div>Low: <span style="font-weight:bold">${candleL.toFixed(decimalPlaces)}</span></div>
-                 <div>Close: <span style="font-weight:bold">${candleC.toFixed(decimalPlaces)}</span></div>
-               </div>
-             `;
-          } else if (typeof value === 'number') {
-            // Default formatter for other line series (indicators, prediction)
-            return `<div class="apexcharts-tooltip-series-item" style="display: flex; justify-content: space-between; padding: 2px 0;"><span>${seriesName}:</span> <span style="font-weight:bold">${value.toFixed(decimalPlaces)}</span></div>`;
+          if (!candle || !candle.x || !Array.isArray(candle.y) || candle.y.length < 4) {
+            return ''; // Basic check
           }
-          return ''; // Return empty string if value is not suitable
+
+          const o = candle.y[0]?.toFixed(pipDigits);
+          const h = candle.y[1]?.toFixed(pipDigits);
+          const l = candle.y[2]?.toFixed(pipDigits);
+          const c = candle.y[3]?.toFixed(pipDigits);
+          const volume = volumeData[dataPointIndex]?.y ?? 0;
+
+          let tooltipHtml = `
+            <div class="apexcharts-tooltip-candlestick p-2 rounded shadow-lg bg-background border border-border">
+              <div class="font-semibold mb-1">${candle.x.toLocaleString()}</div>
+              <div><span class="font-medium">O:</span> ${o}</div>
+              <div><span class="font-medium">H:</span> ${h}</div>
+              <div><span class="font-medium">L:</span> ${l}</div>
+              <div><span class="font-medium">C:</span> ${c}</div>
+              <div><span class="font-medium">Vol:</span> ${volume.toLocaleString()}</div>
+          `;
+
+          // Add prediction value if available and mode is on
+          if (predictiveMode && predictionSeries.length > 0 && predictionSeries[0].data.length > dataPointIndex) {
+            const predictionPoint = predictionSeries[0].data[dataPointIndex] as PredictionSeriesData | undefined;
+            if (predictionPoint && predictionPoint.y !== undefined) {
+              tooltipHtml += `<div class="mt-1 pt-1 border-t border-border"><span class="font-medium text-blue-500">Pred:</span> ${predictionPoint.y.toFixed(pipDigits)}</div>`;
+            }
+          }
+          
+           // Add indicator values if available
+          indicatorSeries.forEach(indSeries => {
+            const indPoint = indSeries.data[dataPointIndex] as { x: Date, y: number } | undefined;
+            if (indPoint?.y !== undefined) {
+               tooltipHtml += `<div><span class="font-medium" style="color:${indSeries.color};">${indSeries.name}:</span> ${indPoint.y.toFixed(pipDigits)}</div>`;
+            }
+          });
+
+          tooltipHtml += `</div>`;
+          return tooltipHtml;
         },
       },
       // Style the tooltip (optional)
@@ -385,7 +463,9 @@ const TradingChart: React.FC<TradingChartProps> = ({
       }
     },
     stroke: {
-       width: [1.5, 1, 1, 1, 1, 1] // Default widths [Candles, Pred, SMA, EMA, BB Upper, BB Lower] - Adjust if adding more series
+       width: strokeWidths, // Use dynamic widths
+       dashArray: strokeDashArrays, // Use dynamic dashes
+       curve: 'smooth',
     },
     legend: {
       show: false // Using badges for legend control
@@ -396,7 +476,18 @@ const TradingChart: React.FC<TradingChartProps> = ({
     markers: {
       size: 0 // No markers on lines by default
     },
-  }), [pairId, timeframe, isClient, pipDigits]); // Dependencies: Recalculate if pair, timeframe, or theme changes. pipDigits is stable.
+  }), [
+      pairId, 
+      timeframe, 
+      isClient, 
+      pipDigits, 
+      candleData, 
+      indicatorSeries, 
+      predictionSeries, 
+      predictiveMode, 
+      strokeWidths, 
+      strokeDashArrays
+  ]);
 
   // Volume Chart Options (Memoized)
   const volumeOptions: ApexOptions = useMemo(() => ({
@@ -427,19 +518,19 @@ const TradingChart: React.FC<TradingChartProps> = ({
      fill: {
         // Color bars based on corresponding candle's direction
         // Requires candleData to be available in this scope
-        colors: [({ value, seriesIndex, dataPointIndex, w }) => {
-            // Check if candleData exists and has the corresponding point
-            if (candleData && candleData[dataPointIndex] && Array.isArray(candleData[dataPointIndex].y) && candleData[dataPointIndex].y.length >= 4) {
-                const open = candleData[dataPointIndex].y[0];
-                const close = candleData[dataPointIndex].y[3];
-                if (close >= open) {
-                    return '#10B981'; // Green for up candle
-                } else {
-                    return '#EF4444'; // Red for down candle
-                }
+        colors: [({ dataPointIndex }: { dataPointIndex: number }) => { // Type dataPointIndex
+          // Check if candleData exists and has the corresponding point
+          if (candleData && candleData[dataPointIndex] && Array.isArray(candleData[dataPointIndex].y) && candleData[dataPointIndex].y.length >= 4) {
+            const open = candleData[dataPointIndex].y[0];
+            const close = candleData[dataPointIndex].y[3];
+            if (close >= open) {
+                return '#10B981'; // Green for up candle
+            } else {
+                return '#EF4444'; // Red for down candle
             }
-            // Default color if data is unavailable
-            return isClient ? (document.documentElement.classList.contains('dark') ? '#444' : '#ccc') : '#ccc';
+          }
+          // Default color if data is unavailable
+          return isClient ? (document.documentElement.classList.contains('dark') ? '#444' : '#ccc') : '#ccc';
         }]
      },
     dataLabels: { enabled: false },
@@ -458,12 +549,10 @@ const TradingChart: React.FC<TradingChartProps> = ({
         style: {
           colors: isClient ? (document.documentElement.classList.contains('dark') ? '#adb5bd' : '#555') : '#555'
         },
-        formatter: (value: number | undefined) => {
-          if (value === undefined || value === null) return '0';
-          if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
-          if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
-          if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
-          return value.toFixed(0);
+        formatter: (value: number | string | undefined): string => { // Ensure value is number or string
+            if (typeof value === 'number') return value.toLocaleString();
+            if (typeof value === 'string') return parseFloat(value).toLocaleString(); // Attempt conversion if string
+            return '0';
         }
       },
     },
@@ -481,7 +570,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
         formatter: (value: number | undefined) => value?.toLocaleString() ?? '0'
       }
     },
-  }), [pairId, timeframe, isClient, candleData]); // Dependencies: Recalculate if pair, timeframe, theme, or candleData (for bar colors) changes.
+  }), [pairId, timeframe, isClient, candleData]);
 
   // --- Render Logic ---
 
@@ -526,7 +615,16 @@ const TradingChart: React.FC<TradingChartProps> = ({
 
   const allSeries = [
     { name: 'Candles', type: 'candlestick', data: processedCandleData }, // Use processed data
-    ...predictionSeries, // Add prediction line if available
+    // Conditionally add prediction series if predictiveMode is true and data exists
+    ...(predictiveMode && predictionSeries.length > 0 ? predictionSeries.map(series => ({
+          ...series,
+          type: 'line', // Ensure it's a line
+          stroke: {
+              width: 2,
+              dashArray: 5, // Make it dashed
+              curve: 'smooth' // Optional: smooth line
+          },
+      })) : []), 
     ...indicatorSeries, // Add active indicator lines
   ];
 

@@ -579,6 +579,36 @@ class TradingController extends Controller
     }
     
     /**
+     * Get predictive data for a currency pair.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function getPredictiveData(Request $request)
+    {
+        $request->validate([
+            'pair' => 'required|string',
+            'timeframe' => 'required|string|in:1m,5m,15m,30m,1h,4h,1d,1w',
+            'count' => 'sometimes|integer|min:10|max:500',
+        ]);
+
+        $pair = $request->input('pair');
+        $timeframe = $request->input('timeframe');
+        $count = $request->input('count', 200);
+
+        // First, get historical data
+        $historicalData = $this->marketDataService->getHistoricalPriceData($pair, 30, $timeframe);
+        
+        // Then generate predictive data based on historical data
+        $predictiveData = $this->marketDataService->generatePredictiveData($historicalData, $pair, $timeframe);
+
+        return response()->json([
+            'success' => true,
+            'data' => $predictiveData,
+        ]);
+    }
+    
+    /**
      * Get or create a trading wallet for the user based on their current mode.
      */
     protected function getOrCreateTradingWallet(User $user, $demoMode = null)

@@ -43,11 +43,14 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
     Route::post('wallets/{id}/withdraw', [WalletController::class, 'withdraw'])->name('wallets.withdraw');
 
     // Trading routes
-    Route::get('trading/chart-data', [TradingController::class, 'getChartData'])->name('trading.chart-data');
-    Route::resource('trading', TradingController::class);
-    Route::post('trading/positions/{id}/close', [TradingController::class, 'closePosition'])->name('trading.positions.close');
-    Route::post('trading/toggle-mode', [TradingController::class, 'toggleTradingMode'])->name('trading.toggle-mode');
-    Route::post('trading/migrate-data', [TradingController::class, 'migrateExistingData'])->name('trading.migrate-data');
+    Route::middleware(['auth'])->prefix('trading')->name('trading.')->group(function () {
+        Route::get('/', [TradingController::class, 'index'])->name('index');
+        Route::get('/historical-data', [TradingController::class, 'getHistoricalData'])->name('historical-data');
+        Route::get('/predictive-data', [TradingController::class, 'getPredictiveData'])->name('predictive-data');
+        Route::post('/positions', [TradingController::class, 'storePosition'])->name('positions.store');
+        Route::post('/positions/{position}/close', [TradingController::class, 'closePosition'])->name('positions.close');
+        Route::post('/toggle-mode', [TradingController::class, 'toggleTradingMode'])->name('toggle-mode');
+    });
 
     // Portfolio routes
     Route::resource('portfolio', PortfolioController::class);
