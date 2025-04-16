@@ -63,6 +63,27 @@ class DashboardController extends Controller
                 : 0;
         }
         
+        // Get recent closed trades
+        $recentTrades = $user->tradingPositions()
+            ->where('status', 'CLOSED')
+            ->orderBy('exit_time', 'desc')
+            ->take(10)
+            ->get()
+            ->map(function ($trade) {
+                return [
+                    'id' => $trade->id,
+                    'symbol' => $trade->currency_pair,
+                    'type' => $trade->trade_type,
+                    'quantity' => $trade->quantity,
+                    'entry_price' => $trade->entry_price,
+                    'close_price' => $trade->exit_price,
+                    'pnl' => $trade->profit_loss,
+                    'status' => $trade->status,
+                    'opened_at' => $trade->entry_time,
+                    'closed_at' => $trade->exit_time,
+                ];
+            });
+        
         // Get latest market news
         $latestNews = MarketNews::orderBy('time_published', 'desc')
             ->take(5)
@@ -96,6 +117,7 @@ class DashboardController extends Controller
                 'available_margin' => $user->available_margin ?? 0,
             ],
             'plaidAccounts' => $plaidAccounts, // Pass Plaid data to the view
+            'recentTrades' => $recentTrades, // Pass recent trades to the view
         ]);
     }
     

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Head, router, usePage, useForm } from "@inertiajs/react";
+import { Head, router, usePage } from "@inertiajs/react";
 import axios from "axios";
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -11,10 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 import TradingChart from '@/components/trading/trading-chart';
 import { AvailablePairs } from '@/types/currency-pair';
+import OrderForm from '@/components/trading/order-form';
 
 // Define types for our data
 interface Position {
@@ -59,7 +58,7 @@ interface TradingProps {
   account?: Account;
   marketOverview?: MarketOverview;
   availablePairs?: AvailablePairs;
-  pendingOrders?: TradingOrder[]; // Add pendingOrders prop
+  pendingOrders?: TradingOrder[]; // Correct type
 }
 
 interface TradingOrder { // Define TradingOrder type based on backend model
@@ -85,18 +84,6 @@ interface CurrentPrice {
   symbol?: string;
   change?: number;
   change_percent?: number;
-}
-
-interface OrderFormData {
-  [key: string]: string | number | null | boolean; // Refined index signature
-  trading_wallet_id: string | number | null; // Allow null
-  currency_pair: string;
-  side: 'BUY' | 'SELL';
-  order_type: 'MARKET' | 'LIMIT';
-  quantity: number;
-  entry_price: number | null;
-  stop_loss: number | null;
-  take_profit: number | null;
 }
 
 // Define CandleData type locally
@@ -150,7 +137,7 @@ const Trading = ({
   account = { balance: 0, available_margin: 0, leverage: 0, risk_percentage: 0, mode: 'DEMO' },
   marketOverview = { indices: [], forex: [], crypto: [] },
   availablePairs = { forex: [], crypto: [], commodities: [], indices: [] },
-  pendingOrders = [] // Add pendingOrders prop
+  pendingOrders = [] // Correct type
 }: TradingProps) => {
   const { props } = usePage();
   const { flash } = props as unknown as { flash: { success?: string; error?: string } }; // Type assertion for flash
@@ -325,37 +312,6 @@ const Trading = ({
     });
   };
 
-  const toggleTradingMode = async () => {
-    try {
-      const response = await axios.post<{ success: boolean; message: string }>('/trading/toggle-mode');
-      
-      if (response.data.success) {
-        // Update the account information with the new mode
-        // Since we can't use setAccount, we'll reload the page to get the updated account info
-        toast({
-          title: "Success",
-          description: "Trading mode updated successfully"
-        });
-        
-        // Reload the page to get the updated account info
-        setTimeout(() => {
-          router.reload();
-        }, 1500);
-      } else {
-        toast({
-          title: "Error",
-          description: response.data.message || "Failed to update trading mode"
-        });
-      }
-    } catch (error) {
-      console.error('Error toggling trading mode:', error);
-      toast({
-        title: "Error",
-        description: "An error occurred while updating trading mode"
-      });
-    }
-  };
-
   const getPairOptions = useCallback((): Array<{ value: string; label: string }> => {
     if (!availablePairs) return [];
     
@@ -434,6 +390,15 @@ const Trading = ({
     return data;
   };
 
+  const handleOrderSuccess = () => {
+    toast({
+      title: "Success",
+      description: "Order submitted successfully.",
+    });
+    // Refresh pending orders and positions
+    router.reload({ only: ['pendingOrders', 'positions'] });
+  };
+
   return (
     <AppLayout>
       <Head title="Trading">
@@ -457,24 +422,16 @@ const Trading = ({
                 </p>
                 <div className="flex flex-wrap items-center gap-4 mb-4">
                   <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={account.mode === 'LIVE'}
-                      onCheckedChange={toggleTradingMode}
-                      id="demo-mode-toggle"
-                      className={`${
-                        account.mode === 'LIVE' ? 'bg-[#8D5EB7]' : 'bg-gray-400'
-                      } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 bg-input hover:bg-accent cursor-pointer`
-                    }
+                    <Label htmlFor="demo-mode-toggle" className="cursor-pointer">
+                      <span className={account.mode === 'LIVE' ? "text-purple-500 font-medium" : ""}>
+                        Predictive Mode
+                      </span>
+                    </Label>
+                    <div className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 bg-input hover:bg-accent cursor-pointer"
+                      onClick={() => setPredictiveMode(!predictiveMode)}
                     >
-                      <span
-                        className={`${
-                          account.mode === 'LIVE' ? 'translate-x-6' : 'translate-x-1'
-                        } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
-                      />
-                    </Switch>
-                    <span className="text-sm font-medium">
-                      {account.mode === 'DEMO' ? 'Demo Trading' : 'Live Trading'}
-                    </span>
+                      <span className={`${predictiveMode ? "translate-x-6 bg-purple-500" : "translate-x-1 bg-foreground"} inline-block h-4 w-4 rounded-full transition-transform`} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -557,12 +514,12 @@ const Trading = ({
               </div>
             </CardHeader>
             <CardContent>
-            <TradingChart
-    pairSymbol={selectedPair} // Changed from pairId to pairSymbol
-    timeframe={selectedTimeframe}
-    predictiveMode={predictiveMode} // Pass the predictiveMode state
-    historicalDataFn={fetchHistoricalData} // Pass the defined function
-/>
+              <TradingChart
+                pairSymbol={selectedPair} // Changed from pairId to pairSymbol
+                timeframe={selectedTimeframe}
+                predictiveMode={predictiveMode} // Pass the predictiveMode state
+                historicalDataFn={fetchHistoricalData} // Pass the defined function
+              />
             </CardContent>
           </Card>
 
@@ -679,9 +636,11 @@ const Trading = ({
               <CardTitle>Create New Order (Test)</CardTitle>
             </CardHeader>
             <CardContent>
-              <CreateOrderForm 
-                toast={toast} 
-                onClose={() => { /* Dummy close handler */ }}
+              <OrderForm
+                availablePairs={availablePairs}
+                tradingWalletId={null}
+                selectedPair={selectedPair} // Pass the selected pair from Trading page state
+                onSubmitSuccess={handleOrderSuccess} // Pass the success handler
               />
             </CardContent>
           </Card>
@@ -706,9 +665,9 @@ const Trading = ({
                     <TableBody>
                       {marketOverview.forex.map((item) => (
                         <TableRow key={item.symbol}>
-                          <TableCell key={`forex-symbol-${item.symbol}`}>{item.symbol}</TableCell>
-                          <TableCell key={`forex-price-${item.symbol}`}>{formatCurrency(item.price)}</TableCell>
-                          <TableCell key={`forex-change-${item.symbol}`} className={item.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}>
+                          <TableCell className="font-medium">{item.symbol}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                          <TableCell className={`text-right ${item.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
                             {item.change ?? 'N/A'}
                           </TableCell>
                         </TableRow>
@@ -730,9 +689,9 @@ const Trading = ({
                     <TableBody>
                       {marketOverview.crypto.map((item) => (
                         <TableRow key={item.symbol}>
-                          <TableCell key={`crypto-symbol-${item.symbol}`}>{item.symbol}</TableCell>
-                          <TableCell key={`crypto-price-${item.symbol}`}>{formatCurrency(item.price)}</TableCell>
-                          <TableCell key={`crypto-change-${item.symbol}`} className={item.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}>
+                          <TableCell className="font-medium">{item.symbol}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                          <TableCell className={`text-right ${item.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
                             {item.change ?? 'N/A'}
                           </TableCell>
                         </TableRow>
@@ -754,9 +713,9 @@ const Trading = ({
                     <TableBody>
                       {marketOverview.indices.map((item) => (
                         <TableRow key={item.symbol}>
-                          <TableCell key={`indices-symbol-${item.symbol}`}>{item.symbol}</TableCell>
-                          <TableCell key={`indices-price-${item.symbol}`}>{formatCurrency(item.price)}</TableCell>
-                          <TableCell key={`indices-change-${item.symbol}`} className={item.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}>
+                          <TableCell className="font-medium">{item.symbol}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(item.price)}</TableCell>
+                          <TableCell className={`text-right ${item.change.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
                             {item.change ?? 'N/A'}
                           </TableCell>
                         </TableRow>
@@ -774,7 +733,7 @@ const Trading = ({
 };
 
 // Helper component to render market data tables
-const MarketDataTable: React.FC<{ data: MarketOverviewItem[] }> = ({ data }) => {
+const MarketDataTable: React.FC<{ data: MarketOverviewItem[] }> = ({ data }) => { // Correct type for data
   if (!data || data.length === 0) {
     return <p className="text-center text-gray-500 dark:text-gray-400 py-4">No data available.</p>;
   }
@@ -803,7 +762,7 @@ const MarketDataTable: React.FC<{ data: MarketOverviewItem[] }> = ({ data }) => 
 };
 
 // Helper component to render pending orders table
-const PendingOrdersTable: React.FC<{ orders: TradingOrder[], onCancelOrder: (orderId: string | number) => void }> = ({ orders, onCancelOrder }) => {
+const PendingOrdersTable: React.FC<{ orders: TradingOrder[], onCancelOrder: (orderId: string | number) => void }> = ({ orders, onCancelOrder }) => { // Correct type for orders
   return (
     <Table>
       <TableHeader>
@@ -835,196 +794,6 @@ const PendingOrdersTable: React.FC<{ orders: TradingOrder[], onCancelOrder: (ord
         ))}
       </TableBody>
     </Table>
-  );
-};
-
-interface CreateOrderFormProps {
-  onClose: () => void;
-  toast: ({ title, description, variant }: { title: string; description?: string; variant?: "default" | "destructive" | null | undefined }) => void;
-}
-
-const CreateOrderForm: React.FC<CreateOrderFormProps> = ({ 
-  onClose, 
-  toast 
-}) => {
-  // Debug log for props received
-  console.log('DEBUG: CreateOrderForm received props:', {
-  });
-
-  // Use hardcoded currency pairs for now to get past the rendering errors
-  const currencyPairs = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", 
-    "USDCAD", "NZDUSD", "EURGBP", "EURJPY", "GBPJPY"
-  ];
-
-  const { data: formData, setData: setFormData, post, processing, errors, reset } = useForm<OrderFormData>({
-    trading_wallet_id: null, // Initialize as null
-    currency_pair: '', // Initialize as empty string
-    order_type: 'MARKET',
-    side: 'BUY',
-    quantity: 0.01,
-    entry_price: null,
-    stop_loss: null,
-    take_profit: null,
-  });
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target;
-    
-    // Handle different input types
-    if (type === 'number') {
-      const numValue = value === '' ? null : parseFloat(value);
-      setFormData(name as keyof OrderFormData, numValue);
-    } else {
-      setFormData(name as keyof OrderFormData, value);
-    }
-  };
-
-  // Handle select changes (for dropdowns)
-  const handleSelectChange = (name: keyof OrderFormData, value: string) => {
-    setFormData(name, value);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.currency_pair) {
-      toast({ title: 'Error', description: 'Currency pair not selected.' });
-      return;
-    }
-    
-    if (!formData.side) {
-      toast({ title: 'Error', description: 'Side not selected.' });
-      return;
-    }
-    
-    if (!formData.quantity || formData.quantity <= 0) {
-      toast({ title: 'Error', description: 'Invalid quantity.' });
-      return;
-    }
-    
-    if (formData.order_type === 'LIMIT' && (formData.entry_price === null || formData.entry_price <= 0)) {
-      toast({ title: 'Error', description: 'Valid Entry Price is required for Limit orders.' });
-      return;
-    }
-    
-    // Submit the form
-    // Cast to unknown first to satisfy TypeScript's type checking
-    post(route('trading.orders.store'), {
-      onSuccess: () => {
-        toast({ title: 'Order Submitted', description: 'Your order has been placed.' });
-        reset();
-        onClose();
-      },
-      onError: (errors) => {
-        console.error('Failed to submit order:', errors);
-        toast({ title: 'Error', description: 'Failed to submit order. Check console for details.' });
-      },
-    });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="currency_pair">Currency Pair</Label>
-        <Select
-          value={formData.currency_pair}
-          onValueChange={(value) => handleSelectChange('currency_pair', value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select currency pair" />
-          </SelectTrigger>
-          <SelectContent>
-            {currencyPairs.length > 0 ? (
-              // Use simple string array with index-based keys
-              currencyPairs.map((pair, index) => (
-                <SelectItem key={`pair-${index}`} value={pair}>
-                  {pair}
-                </SelectItem>
-              ))
-            ) : (
-              <SelectItem value="" disabled>No pairs available</SelectItem>
-            )}
-          </SelectContent>
-        </Select>
-        {errors.currency_pair && <p className="text-red-500 text-xs mt-1">{errors.currency_pair}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="side">Side</Label>
-        <Select
-          value={formData.side}
-          onValueChange={(value) => handleSelectChange('side', value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select side" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="BUY">Buy</SelectItem>
-            <SelectItem value="SELL">Sell</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.side && <p className="text-red-500 text-xs mt-1">{errors.side}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="order_type">Order Type</Label>
-        <Select
-          value={formData.order_type}
-          onValueChange={(value) => handleSelectChange('order_type', value)}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select order type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="MARKET">Market</SelectItem>
-            <SelectItem value="LIMIT">Limit</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.order_type && <p className="text-red-500 text-xs mt-1">{errors.order_type}</p>}
-      </div>
-
-      {formData.order_type === 'LIMIT' && (
-        <div>
-          <Label htmlFor="entry_price">Entry Price</Label>
-          <Input
-            id="entry_price"
-            name="entry_price"
-            type="number"
-            step="0.00001"
-            min="0.00001"
-            value={formData.entry_price ?? ''}
-            onChange={handleChange}
-            required
-            placeholder="Enter desired entry price"
-            className="mt-1"
-          />
-          {errors.entry_price && <p className="text-red-500 text-xs mt-1">{errors.entry_price}</p>}
-        </div>
-      )}
-
-      <div>
-        <Label htmlFor="quantity">Quantity</Label>
-        <Input id="quantity" name="quantity" type="number" step="0.01" min="0.01" value={formData.quantity} onChange={handleChange} required className="mt-1" />
-        {errors.quantity && <p className="text-red-500 text-xs mt-1">{errors.quantity}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="stop_loss">Stop Loss</Label>
-        <Input id="stop_loss" name="stop_loss" type="number" step="any" value={formData.stop_loss ?? ''} onChange={handleChange} placeholder="Optional stop price" className="mt-1" />
-        {errors.stop_loss && <p className="text-red-500 text-xs mt-1">{errors.stop_loss}</p>}
-      </div>
-
-      <div>
-        <Label htmlFor="take_profit">Take Profit</Label>
-        <Input id="take_profit" name="take_profit" type="number" step="any" value={formData.take_profit ?? ''} onChange={handleChange} placeholder="Optional profit target" className="mt-1" />
-        {errors.take_profit && <p className="text-red-500 text-xs mt-1">{errors.take_profit}</p>}
-      </div>
-
-      <Button type="submit" className="w-full" disabled={processing}>
-        {processing ? 'Submitting...' : 'Submit Order'}
-      </Button>
-    </form>
   );
 };
 

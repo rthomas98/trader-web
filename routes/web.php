@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ConnectedAccountController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FundingController;
@@ -36,6 +37,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(function () {
     // Dashboard route
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Analytics route
+    Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
 
     // Wallet routes
     Route::resource('wallets', WalletController::class);

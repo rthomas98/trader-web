@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowDown, ArrowUp, DollarSign, LineChart, Newspaper, Calendar } from 'lucide-react';
+import RecentTrades, { Trade } from '@/components/portfolio/recent-trades';
 
 // Define types for the props
 interface Wallet {
@@ -101,6 +102,7 @@ interface DashboardProps {
   marketOverview: MarketOverview;
   accountSummary: AccountSummary;
   plaidAccounts: PlaidAccount[];
+  recentTrades: Trade[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -133,6 +135,7 @@ export default function Dashboard({
   marketOverview,
   accountSummary,
   plaidAccounts,
+  recentTrades,
 }: DashboardProps) {
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -188,6 +191,11 @@ export default function Dashboard({
               <div className="text-2xl font-bold">{formatCurrency(accountSummary.available_margin)}</div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Recent Trades */}
+        <div className="grid gap-4">
+          <RecentTrades trades={recentTrades} />
         </div>
 
         {/* Trading Positions & Portfolio */}
