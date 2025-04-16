@@ -84,6 +84,13 @@ interface AccountSummary {
   available_margin: number;
 }
 
+interface PlaidAccount {
+  id: string;
+  name: string;
+  balance: number;
+  currency: string;
+}
+
 interface DashboardProps {
   wallets: Wallet[];
   totalBalance: number;
@@ -93,6 +100,7 @@ interface DashboardProps {
   upcomingEvents: EconomicEvent[];
   marketOverview: MarketOverview;
   accountSummary: AccountSummary;
+  plaidAccounts: PlaidAccount[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -124,6 +132,7 @@ export default function Dashboard({
   upcomingEvents,
   marketOverview,
   accountSummary,
+  plaidAccounts,
 }: DashboardProps) {
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -137,7 +146,13 @@ export default function Dashboard({
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(accountSummary.total_balance)}</div>
+              {wallets && wallets.length > 0 ? (
+                <div className="text-2xl font-bold">{formatCurrency(accountSummary.total_balance)}</div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  Create a wallet to view your balance.
+                </div>
+              )}
             </CardContent>
           </Card>
           <Card>
@@ -247,6 +262,29 @@ export default function Dashboard({
             </CardContent>
           </Card>
         </div>
+
+        {/* Plaid Linked Accounts */}
+        {plaidAccounts && plaidAccounts.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Linked Bank Accounts</CardTitle>
+              <CardDescription>Balances from your connected accounts via Plaid</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {plaidAccounts.map((account) => (
+                  <div key={account.id} className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{account.name}</div>
+                      <div className="text-sm text-muted-foreground">Account ID: ...{account.id.slice(-4)}</div>
+                    </div>
+                    <div className="font-semibold">{formatCurrency(account.balance, account.currency)}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Market News & Economic Calendar */}
         <div className="grid gap-4 md:grid-cols-2">

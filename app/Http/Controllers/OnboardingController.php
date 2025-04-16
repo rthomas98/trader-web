@@ -180,26 +180,35 @@ class OnboardingController extends Controller
         ]);
         
         $user = Auth::user();
+        $amount = $validated['amount'];
+        $currency = 'USD'; // Default currency
         
         // In a real app, this would process the payment through a payment processor
         // For demo purposes, we'll just simulate a successful deposit
         
-        // Update user's wallet balance
-        if ($user->wallet) {
-            $user->wallet->balance += $validated['amount'];
-            $user->wallet->save();
+        // Fetch the user's first trading wallet or create one if none exists
+        $wallet = $user->wallet()->first();
+
+        if ($wallet) {
+            // Wallet exists, update balance
+            $wallet->balance += $amount;
+            $wallet->save();
         } else {
-            // Create a wallet if it doesn't exist
-            $user->wallet()->create([
-                'balance' => $validated['amount'],
-                'currency' => 'USD',
+            // Wallet doesn't exist, create a new one
+            // Assuming default 'LIVE' type and active for onboarding deposit
+            $wallet = $user->wallet()->create([
+                'balance' => $amount,
+                'currency' => $currency,
+                'wallet_type' => 'LIVE', // Determine based on context if needed
+                'is_active' => true,
             ]);
         }
         
-        // Record the transaction
+        // Record the transaction, linking it to the specific wallet
         $user->transactions()->create([
+            'wallet_id' => $wallet->id, // Corrected key to match the database column
             'type' => 'deposit',
-            'amount' => $validated['amount'],
+            'amount' => $amount,
             'status' => 'completed',
             'description' => 'Initial deposit during onboarding',
             'metadata' => [
@@ -210,7 +219,7 @@ class OnboardingController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Deposit processed successfully',
-            'balance' => $user->wallet->balance,
+            'balance' => $wallet->balance, // Return balance from the specific wallet object
         ]);
     }
 }

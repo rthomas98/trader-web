@@ -77,7 +77,10 @@ class DashboardController extends Controller
             
         // Get market overview
         $marketOverview = $this->getMarketOverview();
-        
+
+        // Fetch Plaid account data (placeholder)
+        $plaidAccounts = []; // TODO: Replace with actual Plaid data fetching logic
+
         return Inertia::render('dashboard', [
             'wallets' => $wallets,
             'totalBalance' => $totalBalance,
@@ -92,6 +95,7 @@ class DashboardController extends Controller
                 'portfolio_value' => $portfolioPositions->sum('current_value'),
                 'available_margin' => $user->available_margin ?? 0,
             ],
+            'plaidAccounts' => $plaidAccounts, // Pass Plaid data to the view
         ]);
     }
     

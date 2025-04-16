@@ -743,4 +743,22 @@ class TradingController extends Controller
             'is_active' => $defaultValues['is_active'],
         ]);
     }
+
+    /**
+     * Display the trade history page.
+     */
+    public function history(): Response
+    {
+        $user = Auth::user();
+        $tradingWallet = $this->getOrCreateTradingWallet($user);
+
+        $closedPositions = $tradingWallet->tradingPositions()
+            ->where('status', 'CLOSED')
+            ->orderBy('closed_at', 'desc') // Show most recent closed trades first
+            ->get();
+
+        return Inertia::render('Trading/History', [
+            'closedPositions' => $closedPositions,
+        ]);
+    }
 }

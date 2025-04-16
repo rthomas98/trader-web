@@ -50,6 +50,7 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
         Route::get('/chart-data', [TradingController::class, 'getChartData'])->name('chart-data');
         Route::post('/positions', [TradingController::class, 'storePosition'])->name('positions.store');
         Route::post('/positions/{position}/close', [TradingController::class, 'closePosition'])->name('positions.close');
+        Route::get('/history', [TradingController::class, 'history'])->name('history'); // Add Trade History route
         Route::post('/toggle-mode', [TradingController::class, 'toggleTradingMode'])->name('toggle-mode');
         Route::post('/orders', [TradingController::class, 'storeOrder'])->name('orders.store');
     });

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Transaction;
 
 class User extends Authenticatable
 {
@@ -131,5 +132,21 @@ class User extends Authenticatable
     {
         $type = $this->demo_mode_enabled ? 'DEMO' : 'LIVE';
         return $this->tradingWallets()->where('wallet_type', $type)->where('is_active', true)->first();
+    }
+
+    /**
+     * Define the relationship with TradingWallet.
+     */
+    public function wallet(): HasMany
+    {
+        return $this->hasMany(TradingWallet::class);
+    }
+
+    /**
+     * Define the relationship with Transaction.
+     */
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
     }
 }

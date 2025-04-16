@@ -82,23 +82,28 @@ class TradingPositionFactory extends Factory
     public function closed()
     {
         return $this->state(function (array $attributes) {
-            $entryPrice = $attributes['entry_price'];
-            $tradeType = $attributes['trade_type'];
-            $quantity = $attributes['quantity'];
-            
-            // Generate a random exit price that would result in either profit or loss
+            $entryPrice = $attributes['entry_price'] ?? $this->faker->randomFloat(2, 1, 60000); // Provide default if not set
+            $tradeType = $attributes['trade_type'] ?? $this->faker->randomElement(['BUY', 'SELL']); // Provide default if not set
+            $quantity = $attributes['quantity'] ?? $this->faker->randomFloat(2, 0.1, 10); // Provide default if not set
+            $entryTime = $attributes['entry_time'] ?? $this->faker->dateTimeBetween('-30 days', '-1 day'); // Ensure entry time exists
+
+            // Generate exit time after entry time
+            $exitTime = $this->faker->dateTimeBetween($entryTime, 'now');
+
+            // Generate exit price
             $exitPrice = $tradeType === 'BUY'
-                ? $this->faker->randomFloat(2, $entryPrice * 0.8, $entryPrice * 1.2)
-                : $this->faker->randomFloat(2, $entryPrice * 0.8, $entryPrice * 1.2);
-            
-            // Calculate profit/loss based on trade type
-            $profitLoss = $tradeType === 'BUY'
+                ? $this->faker->randomFloat(2, $entryPrice * 0.8, $entryPrice * 1.2) // Simulate market fluctuation
+                : $this->faker->randomFloat(2, $entryPrice * 0.8, $entryPrice * 1.2); // Simulate market fluctuation
+
+            // Calculate profit/loss
+            $profitLoss = ($tradeType === 'BUY')
                 ? ($exitPrice - $entryPrice) * $quantity
                 : ($entryPrice - $exitPrice) * $quantity;
-            
+
             return [
                 'status' => 'CLOSED',
-                'exit_time' => $this->faker->dateTimeBetween($attributes['entry_time'], 'now'),
+                'exit_time' => $exitTime,
+                'closed_at' => $exitTime, // Set closed_at to the same time as exit_time
                 'exit_price' => $exitPrice,
                 'profit_loss' => $profitLoss,
             ];

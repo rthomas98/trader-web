@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, type LucideIcon } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, History, type LucideIcon } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems = [
@@ -15,8 +15,19 @@ const mainNavItems = [
   },
   {
     title: 'Trading',
-    href: '/trading',
     icon: LineChart as LucideIcon,
+    children: [
+      {
+        title: 'Live Trading',
+        href: '/trading',
+        icon: LineChart as LucideIcon,
+      },
+      {
+        title: 'Trade History',
+        href: '/trading/history',
+        icon: History as LucideIcon,
+      },
+    ],
   },
   {
     title: 'Wallet',
