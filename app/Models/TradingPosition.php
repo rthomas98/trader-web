@@ -50,6 +50,76 @@ class TradingPosition extends Model
         'exit_time' => 'datetime',
     ];
 
+    //region Accessors
+
+    /**
+     * Get the quantity attribute as a float.
+     *
+     * @param  mixed  $value
+     * @return float
+     */
+    public function getQuantityAttribute($value): float
+    {
+        return (float) $value;
+    }
+
+    /**
+     * Get the entry_price attribute as a float.
+     *
+     * @param  mixed  $value
+     * @return float
+     */
+    public function getEntryPriceAttribute($value): float
+    {
+        return (float) $value;
+    }
+
+    /**
+     * Get the stop_loss attribute as a float, handling null.
+     *
+     * @param  mixed  $value
+     * @return float|null
+     */
+    public function getStopLossAttribute($value): ?float
+    {
+        return $value === null ? null : (float) $value;
+    }
+
+    /**
+     * Get the take_profit attribute as a float, handling null.
+     *
+     * @param  mixed  $value
+     * @return float|null
+     */
+    public function getTakeProfitAttribute($value): ?float
+    {
+        return $value === null ? null : (float) $value;
+    }
+
+    /**
+     * Get the exit_price attribute as a float, handling null.
+     *
+     * @param  mixed  $value
+     * @return float|null
+     */
+    public function getExitPriceAttribute($value): ?float
+    {
+        return $value === null ? null : (float) $value;
+    }
+
+    /**
+     * Get the profit_loss attribute as a float, handling null.
+     *
+     * @param  mixed  $value
+     * @return float|null
+     */
+    public function getProfitLossAttribute($value): ?float
+    {
+        return $value === null ? null : (float) $value;
+    }
+
+    //endregion
+
     /**
      * Get the user that owns the trading position.
      */

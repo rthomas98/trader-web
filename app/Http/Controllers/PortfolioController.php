@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\PortfolioPosition;
+use App\Models\TradingPosition;
+use App\Models\Watchlist;
 use App\Services\MarketDataService;
 use App\Services\PortfolioService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class PortfolioController extends Controller
@@ -28,19 +31,58 @@ class PortfolioController extends Controller
      */
     public function index()
     {
+        Log::info('PortfolioController@index: Fetching portfolio data.');
         $user = Auth::user();
-        
+
+        if (!$user) {
+            Log::error('PortfolioController@index: User not authenticated.');
+            abort(403, 'User not authenticated.');
+        }
+
         // Get portfolio summary and positions with current prices
         $portfolioData = $this->portfolioService->getPortfolioSummary($user);
-        $positions = $portfolioData['positions'];
-        $summary = $portfolioData['summary'];
-        $allocations = $portfolioData['allocations'];
+        $performanceData = $this->portfolioService->getPortfolioPerformance($user);
+        $recentTrades = $this->portfolioService->getRecentClosedTrades($user);
+        $openPositions = TradingPosition::where('user_id', $user->id)
+                                        ->where('status', 'OPEN')
+                                        ->orderBy('entry_time', 'desc')
+                                        ->get();
+        $watchlistItems = Watchlist::where('user_id', $user->id)
+            ->orderBy('created_at', 'asc')
+            ->get();
         
+        // Calculate allocations based on count of open positions per symbol (placeholder)
+        $allocations = $openPositions->groupBy('currency_pair')
+            ->map(function ($positions, $symbol) use ($openPositions) {
+                $count = $positions->count();
+                $totalPositions = $openPositions->count();
+                return [
+                    'symbol' => $symbol,
+                    'count' => $count,
+                    // Calculate percentage based on count. Avoid division by zero.
+                    'percentage' => $totalPositions > 0 ? round(($count / $totalPositions) * 100, 2) : 0,
+                    // Placeholder for value - needs market data integration later
+                    'value' => 0, // Example: $positions->sum('current_value') 
+                ];
+            })
+            ->sortByDesc('count') // Sort by count descending
+            ->values(); // Reset keys for JSON array
+        
+        Log::info('PortfolioController@index: Portfolio data fetched successfully.', [
+            'summary_keys' => array_keys($portfolioData['summary'] ?? []),
+            'performance_data_count' => count($performanceData),
+            'recent_trades_count' => count($recentTrades),
+        ]);
+
         return Inertia::render('portfolio/index', [
-            'positions' => $positions,
-            'allocations' => $allocations,
-            'totalValue' => $summary['total_value'],
-            'summary' => $summary,
+            'positions' => $portfolioData['positions'] ?? [], // Ensure defaults
+            'allocations' => $allocations, // Pass calculated allocations
+            'totalValue' => $portfolioData['summary']['total_value'] ?? 0, // Ensure defaults
+            'summary' => $portfolioData['summary'] ?? [], // Ensure defaults
+            'performanceData' => $performanceData,
+            'recentTrades' => $recentTrades, // Pass recent trades
+            'openPositions' => $openPositions, // Pass open positions
+            'watchlist' => $watchlistItems, // Pass watchlist items
         ]);
     }
 

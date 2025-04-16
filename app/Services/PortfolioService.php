@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\PortfolioPosition;
 use App\Models\User;
+use App\Models\TradingPosition;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class PortfolioService
 {
@@ -265,65 +267,42 @@ class PortfolioService
     public function getPortfolioPerformance(User $user, string $timeframe = '1m'): array
     {
         $positions = PortfolioPosition::where('user_id', $user->id)->get();
-        
-        // Determine days based on timeframe
-        $days = 30;
-        switch ($timeframe) {
-            case '1w':
-                $days = 7;
-                break;
-            case '1m':
-                $days = 30;
-                break;
-            case '3m':
-                $days = 90;
-                break;
-            case '6m':
-                $days = 180;
-                break;
-            case '1y':
-                $days = 365;
-                break;
-            case 'ytd':
-                $days = now()->dayOfYear;
-                break;
-        }
-        
-        // Generate daily performance data
+
+        // Calculate monthly performance for the last 12 months
         $performance = [];
-        $startDate = now()->subDays($days);
-        
-        for ($i = 0; $i <= $days; $i++) {
-            $date = $startDate->copy()->addDays($i);
-            $dateStr = $date->format('Y-m-d');
-            
-            $dailyValue = 0;
-            $dailyCost = 0;
-            
+        $endDate = now()->endOfMonth(); // End of the current month
+
+        for ($i = 0; $i < 12; $i++) {
+            // Go back month by month, considering the end of each month
+            $date = $endDate->copy()->subMonthsNoOverflow($i)->endOfMonth();
+            $monthStr = $date->format('M Y'); // Format like 'Apr 2025'
+
+            $monthlyValue = 0;
+
             foreach ($positions as $position) {
-                // In a real app, we would fetch historical prices for this date
-                // For demo, we'll generate a reasonable price based on current price
+                // In a real app, fetch historical price for the end of this month
+                // For demo, simulate price based on current price and time difference
                 $currentPrice = $this->marketDataService->getCurrentPrice($position->symbol);
-                $volatility = mt_rand(-150, 150) / 1000; // -15% to +15%
-                $factor = 1 + ($volatility * ($days - $i) / $days);
-                $historicalPrice = $currentPrice * $factor;
                 
-                $dailyValue += $historicalPrice * $position->quantity;
-                $dailyCost += $position->average_price * $position->quantity;
+                // Simple simulation: Assume price volatility decreases further back in time
+                // This simulation is basic and should be replaced with actual historical data fetching
+                $monthsAgo = $i;
+                $volatilityFactor = 1 + (mt_rand(-50, 50) / 1000) * ($monthsAgo + 1); // Simulate +/- 5% volatility per month back
+                $historicalPrice = $currentPrice * $volatilityFactor;
+
+                $monthlyValue += $historicalPrice * $position->quantity;
             }
-            
+
             $performance[] = [
-                'date' => $dateStr,
-                'value' => $dailyValue,
-                'cost' => $dailyCost,
-                'profit_loss' => $dailyValue - $dailyCost,
-                'profit_loss_percentage' => $dailyCost > 0 ? (($dailyValue - $dailyCost) / $dailyCost) * 100 : 0,
+                'month' => $monthStr,
+                'total' => round($monthlyValue, 2), // Use 'total' to match frontend interface
             ];
         }
-        
-        return $performance;
+
+        // Reverse the array so the oldest month is first
+        return array_reverse($performance);
     }
-    
+
     /**
      * Get portfolio allocation by category.
      *
@@ -340,5 +319,73 @@ class PortfolioService
         });
         
         return $summary['categories'];
+    }
+
+    /**
+     * Get recent closed trades for a user.
+     *
+     * @param User $user
+     * @param int $limit
+     * @return array
+     */
+    public function getRecentClosedTrades(User $user, int $limit = 4): array
+    {
+        $trades = TradingPosition::where('user_id', $user->id)
+            ->where('status', 'CLOSED') // Assuming 'CLOSED' status
+            ->orderBy('closed_at', 'desc') // Assuming 'closed_at' timestamp field
+            ->limit($limit)
+            ->get();
+
+        return $trades->map(function ($trade) {
+            $profitValue = $trade->profit_loss ?? 0;
+            $profitFormatted = sprintf('%s$%s', $profitValue >= 0 ? '+' : '-', number_format(abs($profitValue), 2));
+            $closedAt = Carbon::parse($trade->closed_at);
+
+            return [
+                // Use 'pair' for consistency with frontend interface
+                'pair' => $trade->symbol ?? $trade->currency_pair ?? 'N/A',
+                'type' => $trade->trade_type === 'BUY' ? 'Buy' : 'Sell',
+                'amount' => number_format($trade->quantity ?? 0, 2),
+                // Use 'price' for consistency
+                'price' => number_format($trade->exit_price ?? 0, $this->getDecimalPlaces($trade->symbol)),
+                'profit' => $profitFormatted,
+                'timestamp' => $this->getTimeAgo($closedAt),
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Helper function to format time ago strings.
+     *
+     * @param Carbon $date
+     * @return string
+     */
+    private function getTimeAgo(Carbon $date): string
+    {
+        return $date->diffForHumans(); // Use Carbon's built-in diffForHumans
+    }
+    
+    /**
+     * Helper function to determine decimal places based on symbol (simplified).
+     * In a real app, this might come from symbol metadata.
+     *
+     * @param string|null $symbol
+     * @return int
+     */
+    private function getDecimalPlaces(?string $symbol): int
+    {
+        // Basic heuristic: JPY pairs usually have 3, others often 5 for Forex, crypto varies
+        if (str_contains($symbol ?? '', 'JPY')) {
+            return 3;
+        }
+        if (str_contains($symbol ?? '', 'USD') || str_contains($symbol ?? '', 'EUR') || str_contains($symbol ?? '', 'GBP') || str_contains($symbol ?? '', 'AUD') || str_contains($symbol ?? '', 'CAD') || str_contains($symbol ?? '', 'CHF')) {
+            // Common Forex pairs often use 5 decimal places
+             if (strlen($symbol) > 6) { // Likely Crypto e.g., BTC/USD
+                 return 2; // Default for crypto vs fiat
+             } 
+             return 5;
+        }
+        // Default for indices, stocks, or unknown crypto
+        return 2; 
     }
 }
