@@ -51,6 +51,7 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
         Route::post('/positions', [TradingController::class, 'storePosition'])->name('positions.store');
         Route::post('/positions/{position}/close', [TradingController::class, 'closePosition'])->name('positions.close');
         Route::post('/toggle-mode', [TradingController::class, 'toggleTradingMode'])->name('toggle-mode');
+        Route::post('/orders', [TradingController::class, 'storeOrder'])->name('orders.store');
     });
 
     // Portfolio routes

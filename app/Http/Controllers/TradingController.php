@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Redirect;
+use Illuminate\Http\RedirectResponse;
+use App\Http\Requests\StoreTradingOrderRequest;
 
 class TradingController extends Controller
 {
@@ -49,8 +52,14 @@ class TradingController extends Controller
             ->whereIn('status', ['PENDING', 'PARTIALLY_FILLED'])
             ->get();
         
+        // Fetch Pending Orders
+        $pendingOrders = TradingOrder::where('user_id', $user->id)
+                                     ->where('status', 'PENDING') 
+                                     ->orderBy('created_at', 'desc')
+                                     ->get();
+
         // Get market overview data
-        $marketOverview = $this->marketDataService->getMarketOverview();
+        $marketOverview = $this->tradingService->getMarketOverviewData();
         
         // Get available currency pairs
         $availablePairs = $this->tradingService->getAvailableCurrencyPairs();
@@ -67,6 +76,7 @@ class TradingController extends Controller
             ],
             'marketOverview' => $marketOverview,
             'availablePairs' => $availablePairs,
+            'pendingOrders' => $pendingOrders, 
         ]);
     }
 
@@ -141,6 +151,44 @@ class TradingController extends Controller
                 ->withInput()
                 ->withErrors(['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Store a newly created trading order in storage.
+     */
+    public function storeOrder(StoreTradingOrderRequest $request): RedirectResponse
+    {
+        $validatedData = $request->validated();
+        $user = Auth::user();
+
+        // Determine initial status
+        // For now, all submitted orders become PENDING.
+        // A separate process/service would handle MARKET execution or monitor LIMIT prices.
+        $status = 'PENDING'; 
+
+        // Create the TradingOrder record
+        TradingOrder::create([
+            'user_id' => $user->id,
+            'trading_wallet_id' => $validatedData['trading_wallet_id'],
+            'currency_pair' => $validatedData['currency_pair'],
+            'order_type' => $validatedData['order_type'],
+            'side' => $validatedData['side'],
+            'quantity' => $validatedData['quantity'],
+            'price' => $validatedData['entry_price'], // Use 'price' field for limit price (null for market)
+            'stop_loss' => $validatedData['stop_loss'],
+            'take_profit' => $validatedData['take_profit'],
+            'status' => $status,
+            // 'time_in_force' => $validatedData['time_in_force'] ?? 'GTC', // Example if added later
+        ]);
+
+        // TODO: Trigger asynchronous job/event for market order execution
+        // if ($validatedData['order_type'] === 'MARKET') {
+        //     ProcessMarketOrder::dispatch($order->id);
+        // }
+
+        // TODO: Trigger monitoring for LIMIT orders if needed (or handle via scheduled task)
+
+        return Redirect::route('trading.index')->with('success', 'Trading order placed successfully.');
     }
 
     /**

@@ -306,9 +306,47 @@ class TradingService
      * @param string $currencyPair
      * @return float|null Returns the price as a float, or null if not found.
      */
-    public function getCurrentPrice(string $currencyPair): ?float
+    public function getCurrentPrice(string $symbol)
     {
-        // Delegate the call to the market data service
-        return $this->marketDataService->getCurrentPrice($currencyPair);
+        // Simulate fetching price - replace with actual API call
+        // Example: return Cache::remember('price_' . $symbol, 60, function () use ($symbol) { ... });
+        return match (strtoupper($symbol)) {
+            'EURUSD' => 1.0850 + (rand(-50, 50) / 10000),
+            'GBPUSD' => 1.2700 + (rand(-50, 50) / 10000),
+            'BTCUSD' => 65000.00 + (rand(-500, 500) / 10),
+            'ETHUSD' => 3500.00 + (rand(-100, 100) / 10),
+            'AAPL' => 170.00 + (rand(-50, 50) / 100),
+            'GOOGL' => 140.00 + (rand(-50, 50) / 100),
+            default => 1.00 + (rand(-10, 10) / 1000),
+        };
+    }
+
+    /**
+     * Get market overview data (mock implementation).
+     *
+     * @return array
+     */
+    public function getMarketOverviewData(): array
+    {
+        // In a real application, fetch this data from an API (e.g., Finnhub, Alpha Vantage)
+        // and potentially cache it.
+        return [
+            'forex' => [
+                ['symbol' => 'EUR/USD', 'price' => 1.0855, 'change' => '+0.15%'],
+                ['symbol' => 'GBP/USD', 'price' => 1.2710, 'change' => '-0.05%'],
+                ['symbol' => 'USD/JPY', 'price' => 151.30, 'change' => '+0.20%'],
+            ],
+            'crypto' => [
+                ['symbol' => 'BTC/USD', 'price' => 65432.10, 'change' => '+2.5%'],
+                ['symbol' => 'ETH/USD', 'price' => 3510.50, 'change' => '+1.8%'],
+                ['symbol' => 'SOL/USD', 'price' => 175.80, 'change' => '-1.2%'],
+            ],
+            'indices' => [
+                ['symbol' => 'S&P 500', 'price' => 5200.50, 'change' => '+0.8%'],
+                ['symbol' => 'NASDAQ', 'price' => 16300.75, 'change' => '+1.1%'],
+                ['symbol' => 'FTSE 100', 'price' => 7950.20, 'change' => '+0.5%'],
+            ],
+            // Add other asset classes like commodities if needed
+        ];
     }
 }
