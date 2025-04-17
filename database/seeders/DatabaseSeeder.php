@@ -11,6 +11,12 @@ use Database\Seeders\TradingWalletSeeder;
 use Database\Seeders\WatchlistSeeder;
 use Database\Seeders\RiskManagementSeeder;
 use Database\Seeders\JournalEntrySeeder;
+use Database\Seeders\SocialTradingSeeder;
+use Database\Seeders\TradingStrategySeeder;
+use Database\Seeders\CopyTradingRelationshipSeeder;
+use Database\Seeders\TradeSeeder;
+use Database\Seeders\UserSeeder;
+use Database\Seeders\FollowerSeeder;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -22,7 +28,7 @@ class DatabaseSeeder extends Seeder
      *
      * @return void
      */
-    public function run()
+    public function run(): void
     {
         // User::factory(10)->create();
 
@@ -37,13 +43,11 @@ class DatabaseSeeder extends Seeder
         
         // Uncomment the other seeders
         $this->call([
-            DashboardSeeder::class,
-            TradingDataSeeder::class,
-            TradingWalletSeeder::class,
-            TradingPositionSeeder::class,
-            WatchlistSeeder::class,
-            RiskManagementSeeder::class,
-            JournalEntrySeeder::class,
+            UserSeeder::class,
+            TradingStrategySeeder::class,
+            FollowerSeeder::class,
+            CopyTradingRelationshipSeeder::class,
+            TradeSeeder::class,
         ]);
     }
 }

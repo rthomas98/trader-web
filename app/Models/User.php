@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -13,6 +14,8 @@ use App\Models\Transaction;
 use App\Models\Watchlist;
 use App\Models\TradingJournal;
 use App\Models\JournalComment;
+use App\Models\TradingStrategy;
+use App\Models\CopyTradingSettings;
 
 class User extends Authenticatable
 {
@@ -180,5 +183,65 @@ class User extends Authenticatable
     public function journalComments(): HasMany
     {
         return $this->hasMany(JournalComment::class);
+    }
+
+    /**
+     * Get the trading strategies for the user.
+     */
+    public function strategies(): HasMany
+    {
+        return $this->hasMany(TradingStrategy::class);
+    }
+
+    /**
+     * Get the trades for the user.
+     */
+    public function trades()
+    {
+        return $this->hasMany(Trade::class);
+    }
+
+    /**
+     * The users that the current user follows.
+     */
+    public function following(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'follows', 'follower_id', 'following_id')
+                    ->withTimestamps();
+    }
+
+    /**
+     * The users that follow the current user.
+     */
+    public function followers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'follows', 'following_id', 'follower_id')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get the copy trading relationships where this user is the copier.
+     * (The traders this user is copying)
+     */
+    public function copying(): HasMany
+    {
+        return $this->hasMany(CopyTradingRelationship::class, 'copier_user_id');
+    }
+
+    /**
+     * Get the copy trading relationships where this user is the trader being copied.
+     * (The users copying this user)
+     */
+    public function copiers(): HasMany
+    {
+        return $this->hasMany(CopyTradingRelationship::class, 'trader_user_id');
+    }
+
+    /**
+     * Get the copy trading settings for the user.
+     */
+    public function copyTradingSettings(): HasOne
+    {
+        return $this->hasOne(CopyTradingSettings::class);
     }
 }

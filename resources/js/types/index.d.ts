@@ -1,16 +1,18 @@
 import { LucideIcon } from 'lucide-react';
 import type { Config } from 'ziggy-js';
 
-export interface User {
+export type User = {
     id: number;
     name: string;
     email: string;
-    avatar?: string;
-    email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
-    [key: string]: unknown; // This allows for additional properties...
-}
+    email_verified_at: string;
+    onboarding_completed: boolean;
+    risk_tolerance_level: 'conservative' | 'moderate' | 'aggressive';
+    risk_percentage: number;
+    max_drawdown_percentage: number;
+    trading_account_type: 'DEMO' | 'LIVE';
+    demo_mode_enabled: boolean;
+};
 
 export interface Auth {
     user: User;

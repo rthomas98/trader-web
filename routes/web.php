@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ConnectedAccountController;
+use App\Http\Controllers\CopyTradingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FundingController;
 use App\Http\Controllers\JournalCommentController;
@@ -11,9 +12,11 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PortfolioController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RiskManagementController;
+use App\Http\Controllers\SocialController;
 use App\Http\Controllers\StrategyBacktestingController;
 use App\Http\Controllers\TradingController;
 use App\Http\Controllers\TradingJournalController;
+use App\Http\Controllers\TradingStrategyController;
 use App\Http\Controllers\WalletController;
 use App\Http\Middleware\EnsureOnboardingComplete;
 use Illuminate\Support\Facades\Route;
@@ -68,13 +71,13 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
         Route::get('/{id}', [TradingJournalController::class, 'show'])->name('trading-journal.show');
         Route::get('/{id}/edit', [TradingJournalController::class, 'edit'])->name('trading-journal.edit');
         Route::put('/{id}', [TradingJournalController::class, 'update'])->name('trading-journal.update');
-        Route::delete('/{id}', [TradingJournalController::class, 'destroy'])->name('trading-journal.destroy');
+        Route::post('/{id}/delete', [TradingJournalController::class, 'destroy'])->name('trading-journal.destroy');
         Route::post('/{id}/favorite', [TradingJournalController::class, 'toggleFavorite'])->name('trading-journal.favorite');
         
         // Journal Comment routes
         Route::post('/{journalId}/comments', [JournalCommentController::class, 'store'])->name('journal-comments.store');
         Route::put('/{journalId}/comments/{commentId}', [JournalCommentController::class, 'update'])->name('journal-comments.update');
-        Route::delete('/{journalId}/comments/{commentId}', [JournalCommentController::class, 'destroy'])->name('journal-comments.destroy');
+        Route::post('/{journalId}/comments/{commentId}/delete', [JournalCommentController::class, 'destroy'])->name('journal-comments.destroy');
     });
         
     // Wallet routes
@@ -127,6 +130,48 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
     // Strategy Backtesting
     Route::get('/strategy-backtesting', [StrategyBacktestingController::class, 'index'])->name('strategy-backtesting.index');
     Route::post('/strategy-backtesting/run', [StrategyBacktestingController::class, 'runBacktest'])->name('strategy-backtesting.run');
+
+    // Social Trading routes
+    Route::prefix('social')->name('social.')->group(function () {
+        Route::get('/', [SocialController::class, 'index'])->name('index');
+        Route::get('/followers', [SocialController::class, 'followers'])->name('followers');
+        Route::get('/following', [SocialController::class, 'following'])->name('following');
+        Route::get('/trader/{user}', [SocialController::class, 'showTrader'])->name('trader');
+        Route::post('/follow/{user}', [SocialController::class, 'follow'])->name('follow');
+        Route::delete('/unfollow/{user}', [SocialController::class, 'unfollow'])->name('unfollow');
+        Route::get('/search', [SocialController::class, 'search'])->name('search');
+        Route::get('/popular', [SocialController::class, 'popularTraders'])->name('popular');
+    });
+
+    // Trading Strategies Management
+    Route::prefix('my-strategies')->name('my-strategies.')->group(function () {
+        Route::get('/', [TradingStrategyController::class, 'index'])->name('index');
+        Route::post('/', [TradingStrategyController::class, 'store'])->name('store');
+        Route::put('/{strategy}', [TradingStrategyController::class, 'update'])->name('update');
+        Route::post('/{strategy}/delete', [TradingStrategyController::class, 'destroy'])->name('destroy');
+    });
+
+    // Copy Trading Management
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/copy-trading', [CopyTradingController::class, 'index'])->name('copy-trading.index');
+        Route::post('/copy-trading', [CopyTradingController::class, 'store'])->name('copy-trading.store');
+        Route::put('/copy-trading/{relationship}', [CopyTradingController::class, 'update'])->name('copy-trading.update');
+        Route::post('/copy-trading/{relationship}/delete', [CopyTradingController::class, 'destroy'])->name('copy-trading.destroy');
+        Route::post('/copy-trading/{relationship}/reactivate', [CopyTradingController::class, 'reactivate'])->name('copy-trading.reactivate');
+        Route::get('/copy-trading/{relationship}/performance', [CopyTradingController::class, 'performance'])->name('copy-trading.performance');
+        
+        // Copy Trading Settings
+        Route::get('/copy-trading/settings', [CopyTradingController::class, 'settings'])->name('copy-trading.settings');
+        Route::post('/copy-trading/settings', [CopyTradingController::class, 'updateSettings'])->name('copy-trading.updateSettings');
+        
+        // Top Traders and Recent Trades
+        Route::get('/copy-trading/top-traders', [CopyTradingController::class, 'topTraders'])->name('copy-trading.topTraders');
+        
+        // Copy Trading Approval Management
+        Route::post('/copy-trading/{relationship}/approve', [CopyTradingController::class, 'approveRequest'])->name('copy-trading.approve');
+        Route::post('/copy-trading/{relationship}/reject', [CopyTradingController::class, 'rejectRequest'])->name('copy-trading.reject');
+        Route::post('/copy-trading/{relationship}/block', [CopyTradingController::class, 'blockCopier'])->name('copy-trading.block');
+    });
 });
 
 // Debug routes

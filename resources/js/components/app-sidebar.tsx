@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, History, Briefcase, BarChart2, Shield, BookText, PenLine, ClipboardList, type LucideIcon } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, History, Briefcase, BarChart2, Shield, BookText, PenLine, ClipboardList, Users, UserPlus, UserCheck, BrainCircuit, Copy, TrendingUp, type LucideIcon } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems = [
@@ -64,6 +64,43 @@ const mainNavItems = [
     title: 'Strategy Backtesting',
     href: '/strategy-backtesting',
     icon: ClipboardList as LucideIcon,
+  },
+  {
+    title: 'My Trading Strategies',
+    href: '/my-strategies',
+    icon: BrainCircuit as LucideIcon,
+  },
+  {
+    title: 'Social Trading',
+    icon: Users as LucideIcon,
+    children: [
+      {
+        title: 'Discover Traders',
+        href: '/social',
+        icon: Users as LucideIcon,
+      },
+      {
+        title: 'Following',
+        href: '/social/following',
+        icon: UserPlus as LucideIcon,
+      },
+      {
+        title: 'My Followers',
+        href: '/social/followers',
+        icon: UserCheck as LucideIcon,
+      },
+    ],
+  },
+  {
+    title: 'Copy Trading',
+    icon: Copy as LucideIcon,
+    children: [
+      {
+        title: 'My Copy Relationships',
+        href: '/copy-trading',
+        icon: TrendingUp as LucideIcon,
+      },
+    ],
   },
   {
     title: 'Wallet',
