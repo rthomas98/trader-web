@@ -41,4 +41,9 @@ return [
         'environment' => env('PLAID_ENVIRONMENT', 'sandbox'),
     ],
 
+    'alpha_vantage' => [
+        'key' => env('ALPHA_VANTAGE_API_KEY'),
+        'url' => env('ALPHA_VANTAGE_URL', 'https://www.alphavantage.co/query'),
+    ],
+
 ];

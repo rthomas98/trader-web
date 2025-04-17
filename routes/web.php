@@ -11,6 +11,7 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PortfolioController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RiskManagementController;
+use App\Http\Controllers\StrategyBacktestingController;
 use App\Http\Controllers\TradingController;
 use App\Http\Controllers\TradingJournalController;
 use App\Http\Controllers\WalletController;
@@ -122,6 +123,10 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
 
     // Journal Entry routes
     Route::resource('journal-entries', JournalEntryController::class);
+
+    // Strategy Backtesting
+    Route::get('/strategy-backtesting', [StrategyBacktestingController::class, 'index'])->name('strategy-backtesting.index');
+    Route::post('/strategy-backtesting/run', [StrategyBacktestingController::class, 'runBacktest'])->name('strategy-backtesting.run');
 });
 
 // Debug routes
