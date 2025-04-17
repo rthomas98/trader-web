@@ -1,13 +1,19 @@
-import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarCollapsible } from '@/components/ui/sidebar';
+import { SidebarGroup, SidebarGroupLabel, SidebarMenuButton, SidebarMenuItem, SidebarCollapsible, SidebarMenu } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronDown } from 'lucide-react';
+import { ReactNode } from 'react';
 
-export function NavMain({ items = [] }: { items: NavItem[] }) {
+interface NavMainProps {
+    items: NavItem[];
+    renderTitle?: (item: NavItem) => ReactNode;
+}
+
+export function NavMain({ items = [], renderTitle }: NavMainProps) {
     const page = usePage();
     
     const renderNavItem = (item: NavItem) => {
-        const isActive = page.url.startsWith(item.href);
+        const isActive = item.href ? page.url.startsWith(item.href) : false;
         
         // If the item has children, render a collapsible menu
         if (item.children && item.children.length > 0) {
@@ -18,7 +24,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                         <div className="flex items-center justify-between w-full">
                             <div className="flex items-center gap-2">
                                 {item.icon && <item.icon className="h-4 w-4" />}
-                                <span>{item.title}</span>
+                                <span>{renderTitle ? renderTitle(item) : item.title}</span>
                             </div>
                             <ChevronDown className="h-4 w-4" />
                         </div>
@@ -33,9 +39,9 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                     isActive={child.href === page.url}
                                     tooltip={{ children: child.title }}
                                 >
-                                    <Link href={child.href} prefetch>
+                                    <Link href={child.href || '#'} prefetch>
                                         {child.icon && <child.icon className="h-4 w-4" />}
-                                        <span>{child.title}</span>
+                                        <span>{renderTitle ? renderTitle(child) : child.title}</span>
                                     </Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -48,14 +54,14 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
         // Otherwise, render a regular menu item
         return (
             <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton  
+                <SidebarMenuButton 
                     asChild
                     isActive={item.href === page.url}
                     tooltip={{ children: item.title }}
                 >
-                    <Link href={item.href} prefetch>
+                    <Link href={item.href || '#'} prefetch>
                         {item.icon && <item.icon className="h-4 w-4" />}
-                        <span>{item.title}</span>
+                        <span>{renderTitle ? renderTitle(item) : item.title}</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
@@ -63,8 +69,8 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
     };
     
     return (
-        <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+        <SidebarGroup>
+            <SidebarGroupLabel>Main</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map(renderNavItem)}
             </SidebarMenu>

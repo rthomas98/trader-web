@@ -11,9 +11,10 @@ export interface User {
 
 export interface NavItem {
   title: string;
-  href: string;
+  href?: string;
   icon?: LucideIcon;
   children?: NavItem[] | null;
+  id?: string;
 }
 
 export interface BreadcrumbItem {

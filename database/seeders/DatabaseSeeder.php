@@ -17,6 +17,8 @@ use Database\Seeders\CopyTradingRelationshipSeeder;
 use Database\Seeders\TradeSeeder;
 use Database\Seeders\UserSeeder;
 use Database\Seeders\FollowerSeeder;
+use Database\Seeders\NotificationPreferenceSeeder;
+use Database\Seeders\PriceAlertSeeder;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -48,6 +50,8 @@ class DatabaseSeeder extends Seeder
             FollowerSeeder::class,
             CopyTradingRelationshipSeeder::class,
             TradeSeeder::class,
+            NotificationPreferenceSeeder::class,
+            PriceAlertSeeder::class,
         ]);
     }
 }

@@ -4,18 +4,22 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, History, Briefcase, BarChart2, Shield, BookText, PenLine, ClipboardList, Users, UserPlus, UserCheck, BrainCircuit, Copy, TrendingUp, type LucideIcon } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, History, Briefcase, BarChart2, Shield, BookText, PenLine, ClipboardList, Users, UserPlus, UserCheck, BrainCircuit, Copy, TrendingUp, Bell, type LucideIcon } from 'lucide-react';
 import AppLogo from './app-logo';
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Badge } from '@/components/ui/badge';
+import { route } from 'ziggy-js';
 
 const mainNavItems = [
   {
     title: 'Dashboard',
-    href: '/dashboard',
+    href: route('dashboard'),
     icon: LayoutGrid as LucideIcon,
   },
   {
     title: 'Analytics',
-    href: '/analytics',
+    href: route('analytics.index'),
     icon: BarChart2 as LucideIcon,
   },
   {
@@ -29,19 +33,19 @@ const mainNavItems = [
     children: [
       {
         title: 'Live Trading',
-        href: '/trading',
+        href: route('trading.index'),
         icon: LineChart as LucideIcon,
       },
       {
         title: 'Trade History',
-        href: '/trading/history',
+        href: route('trading.history'),
         icon: History as LucideIcon,
       },
     ],
   },
   {
     title: 'Risk Management',
-    href: '/risk-management',
+    href: route('risk-management'),
     icon: Shield as LucideIcon,
   },
   {
@@ -50,24 +54,24 @@ const mainNavItems = [
     children: [
       {
         title: 'Journal Entries',
-        href: '/trading-journal',
+        href: route('trading-journal.index'),
         icon: BookText as LucideIcon,
       },
       {
         title: 'Create Entry',
-        href: '/trading-journal/create',
+        href: route('trading-journal.create'),
         icon: PenLine as LucideIcon,
       },
     ],
   },
   {
     title: 'Strategy Backtesting',
-    href: '/strategy-backtesting',
+    href: route('strategy-backtesting.index'),
     icon: ClipboardList as LucideIcon,
   },
   {
     title: 'My Trading Strategies',
-    href: '/my-strategies',
+    href: route('my-strategies.index'),
     icon: BrainCircuit as LucideIcon,
   },
   {
@@ -76,17 +80,17 @@ const mainNavItems = [
     children: [
       {
         title: 'Discover Traders',
-        href: '/social',
+        href: route('social.index'),
         icon: Users as LucideIcon,
       },
       {
         title: 'Following',
-        href: '/social/following',
+        href: route('social.following'),
         icon: UserPlus as LucideIcon,
       },
       {
         title: 'My Followers',
-        href: '/social/followers',
+        href: route('social.followers'),
         icon: UserCheck as LucideIcon,
       },
     ],
@@ -97,29 +101,45 @@ const mainNavItems = [
     children: [
       {
         title: 'My Copy Relationships',
-        href: '/copy-trading',
+        href: route('copy-trading.index'),
+        icon: TrendingUp as LucideIcon,
+      },
+    ],
+  },
+  {
+    title: 'Notifications',
+    icon: Bell as LucideIcon,
+    id: 'notifications-menu',
+    children: [
+      {
+        title: 'All Notifications',
+        href: route('notifications.settings'),
+        icon: Bell as LucideIcon,
+      },
+      {
+        title: 'Price Alerts',
+        href: route('notifications.settings') + '?tab=price-alerts',
         icon: TrendingUp as LucideIcon,
       },
     ],
   },
   {
     title: 'Wallet',
-    href: '/wallets',
     icon: Wallet as LucideIcon,
     children: [
       {
         title: 'My Wallets',
-        href: '/wallets',
+        href: route('wallets.index'),
         icon: PiggyBank as LucideIcon,
       },
       {
         title: 'Connected Accounts',
-        href: '/connected-accounts',
+        href: route('connected-accounts.index'),
         icon: CreditCard as LucideIcon,
       },
       {
         title: 'Funding',
-        href: '/funding',
+        href: route('funding.index'),
         icon: ArrowLeftRight as LucideIcon,
       },
     ],
@@ -134,19 +154,65 @@ const footerNavItems = [
   },
   {
     title: 'Documentation',
-    href: 'https://laravel.com/docs/starter-kits',
+    href: 'https://laravel.com/docs',
     icon: BookOpen as LucideIcon,
   },
 ] as NavItem[];
 
 export function AppSidebar() {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    // Set up axios defaults for CSRF protection
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (token) {
+      axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
+    }
+    
+    // Function to fetch notification count
+    const fetchNotificationCount = async () => {
+      try {
+        const response = await axios.get('/api/notifications/count');
+        if (response.data && typeof response.data.unreadCount === 'number') {
+          setUnreadCount(response.data.unreadCount);
+        }
+      } catch (error) {
+        console.error('Error fetching notification count:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchNotificationCount();
+    
+    // Set up polling for notification count (every 30 seconds)
+    const countInterval = setInterval(fetchNotificationCount, 30000);
+    
+    // Clean up intervals on component unmount
+    return () => {
+      clearInterval(countInterval);
+    };
+  }, []);
+
+  // Custom render function for menu items to add notification badge
+  const renderMenuItem = (item: NavItem) => {
+    if (item.id === 'notifications-menu' && unreadCount > 0) {
+      return (
+        <div className="flex items-center justify-between w-full">
+          <span>{item.title}</span>
+          <Badge variant="default" className="ml-2 bg-primary">{unreadCount > 9 ? '9+' : unreadCount}</Badge>
+        </div>
+      );
+    }
+    return item.title;
+  };
+
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard" prefetch>
+              <Link href={route('dashboard')} prefetch>
                 <AppLogo />
               </Link>
             </SidebarMenuButton>
@@ -155,7 +221,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain items={mainNavItems} />
+        <NavMain items={mainNavItems} renderTitle={renderMenuItem} />
       </SidebarContent>
 
       <SidebarFooter>

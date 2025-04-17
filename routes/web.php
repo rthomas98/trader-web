@@ -8,6 +8,7 @@ use App\Http\Controllers\FundingController;
 use App\Http\Controllers\JournalCommentController;
 use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\MarketDataController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PortfolioController;
 use App\Http\Controllers\ProfileController;
@@ -171,6 +172,15 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
         Route::post('/copy-trading/{relationship}/approve', [CopyTradingController::class, 'approveRequest'])->name('copy-trading.approve');
         Route::post('/copy-trading/{relationship}/reject', [CopyTradingController::class, 'rejectRequest'])->name('copy-trading.reject');
         Route::post('/copy-trading/{relationship}/block', [CopyTradingController::class, 'blockCopier'])->name('copy-trading.block');
+        
+        // Notification Management
+        Route::get('/notifications/settings', [NotificationController::class, 'settings'])->name('notifications.settings');
+        Route::post('/notifications/preferences', [NotificationController::class, 'updatePreferences'])->name('notifications.updatePreferences');
+        Route::post('/notifications/price-alerts', [NotificationController::class, 'createPriceAlert'])->name('notifications.createPriceAlert');
+        Route::delete('/notifications/price-alerts/{priceAlert}', [NotificationController::class, 'deletePriceAlert'])->name('notifications.deletePriceAlert');
+        Route::post('/notifications/mark-as-read', [NotificationController::class, 'markAsRead'])->name('notifications.markAsRead');
+        Route::post('/notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('notifications.markAllAsRead');
+        Route::delete('/notifications/{notification}', [NotificationController::class, 'deleteNotification'])->name('notifications.deleteNotification');
     });
 });
 

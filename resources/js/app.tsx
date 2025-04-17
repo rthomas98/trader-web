@@ -1,4 +1,5 @@
 import '../css/app.css';
+import axios from 'axios'; 
 
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
@@ -6,6 +7,16 @@ import { createRoot } from 'react-dom/client';
 import { initializeTheme } from './hooks/use-appearance';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+// --- Global Axios Configuration ---
+axios.defaults.withCredentials = true; // Enable sending cookies
+// axios.defaults.baseURL = import.meta.env.VITE_APP_URL; // Set base URL for API requests
+
+// Fetch CSRF token to enable stateful API requests
+axios.get('/sanctum/csrf-cookie').catch(error => {
+    console.error('Could not fetch CSRF cookie from Sanctum:', error);
+});
+// --------------------------------
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,

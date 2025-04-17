@@ -114,7 +114,7 @@ export default function TopTraders({ auth, topTraders, recentTrades }: TopTrader
                   <Shield className="h-4 w-4" />
                 </Link>
               </Button>
-              <Badge variant="secondary" className="text-primary bg-[#8D5EB7]/10 text-[#8D5EB7]">Discover</Badge>
+              <Badge variant="secondary" className="text-primary bg-primary/10">Discover</Badge>
             </div>
           </div>
 
@@ -132,28 +132,28 @@ export default function TopTraders({ auth, topTraders, recentTrades }: TopTrader
               <Button
                 variant={selectedRisk === "all" ? "default" : "outline"}
                 onClick={() => setSelectedRisk("all")}
-                className={selectedRisk === "all" ? "bg-[#8D5EB7] hover:bg-[#8D5EB7]/90" : ""}
+                className={selectedRisk === "all" ? "bg-primary hover:bg-primary/90" : ""}
               >
                 All
               </Button>
               <Button
                 variant={selectedRisk === "low" ? "default" : "outline"}
                 onClick={() => setSelectedRisk("low")}
-                className={selectedRisk === "low" ? "bg-[#8D5EB7] hover:bg-[#8D5EB7]/90" : ""}
+                className={selectedRisk === "low" ? "bg-primary hover:bg-primary/90" : ""}
               >
                 Low Risk
               </Button>
               <Button
                 variant={selectedRisk === "medium" ? "default" : "outline"}
                 onClick={() => setSelectedRisk("medium")}
-                className={selectedRisk === "medium" ? "bg-[#8D5EB7] hover:bg-[#8D5EB7]/90" : ""}
+                className={selectedRisk === "medium" ? "bg-primary hover:bg-primary/90" : ""}
               >
                 Medium Risk
               </Button>
               <Button
                 variant={selectedRisk === "high" ? "default" : "outline"}
                 onClick={() => setSelectedRisk("high")}
-                className={selectedRisk === "high" ? "bg-[#8D5EB7] hover:bg-[#8D5EB7]/90" : ""}
+                className={selectedRisk === "high" ? "bg-primary hover:bg-primary/90" : ""}
               >
                 High Risk
               </Button>
@@ -219,7 +219,7 @@ export default function TopTraders({ auth, topTraders, recentTrades }: TopTrader
                             </p>
                           </div>
                           <Button 
-                            className="ml-4 bg-[#8D5EB7] hover:bg-[#8D5EB7]/90"
+                            className="ml-4 bg-primary hover:bg-primary/90"
                             onClick={() => handleCopyTrader(trader)}
                             disabled={isLoading[trader.id]}
                           >
@@ -300,7 +300,7 @@ export default function TopTraders({ auth, topTraders, recentTrades }: TopTrader
                   <p className="text-sm text-muted-foreground mb-4">
                     View and manage your copy trading relationships
                   </p>
-                  <Button asChild className="bg-[#8D5EB7] hover:bg-[#8D5EB7]/90">
+                  <Button asChild className="bg-primary hover:bg-primary/90">
                     <Link href={route('copy-trading.index')}>
                       Go to Copy Trading Dashboard
                     </Link>

@@ -16,6 +16,8 @@ use App\Models\TradingJournal;
 use App\Models\JournalComment;
 use App\Models\TradingStrategy;
 use App\Models\CopyTradingSettings;
+use App\Models\PriceAlert;
+use App\Models\NotificationPreference;
 
 class User extends Authenticatable
 {
@@ -243,5 +245,21 @@ class User extends Authenticatable
     public function copyTradingSettings(): HasOne
     {
         return $this->hasOne(CopyTradingSettings::class);
+    }
+    
+    /**
+     * Get the notification preferences for the user.
+     */
+    public function notificationPreference(): HasOne
+    {
+        return $this->hasOne(NotificationPreference::class);
+    }
+    
+    /**
+     * Get the price alerts for the user.
+     */
+    public function priceAlerts(): HasMany
+    {
+        return $this->hasMany(PriceAlert::class);
     }
 }

@@ -6,7 +6,8 @@ import { TradingPosition } from '@/types/trading-position'; // Import TradingPos
 import { WatchlistItem } from '@/types/watchlist-item'; // Import WatchlistItem type
 import { AllocationItem } from '@/types/allocation-item'; // Import AllocationItem type
 import { Overview } from '@/components/portfolio/overview';
-import { RecentTrades, type Trade as RecentTradeType } from '@/components/portfolio/recent-trades'; // Import RecentTrades and its type
+import RecentTrades from '@/components/portfolio/recent-trades'; // Import RecentTrades (default)
+import { Trade as RecentTradeType } from '@/components/portfolio/recent-trades'; // Import Trade type (named)
 import OpenPositions from '@/components/portfolio/open-positions'; // Import OpenPositions component
 import Watchlist from '@/components/portfolio/watchlist'; // Import the new Watchlist component
 import Allocations from '@/components/portfolio/allocations'; // Import the Allocations component
@@ -135,7 +136,7 @@ export default function PortfolioPage({ summary, performanceData = [], recentTra
 
                     {/* Recent Trades / Activity Feed */}
                     <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                        <RecentTrades trades={recentTrades} loading={loading} />
+                        <RecentTrades trades={recentTrades || []} /> {/* Remove loading prop */}
                     </div>
                 </div>
 
