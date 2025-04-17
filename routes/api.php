@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\TradingController;
+use App\Http\Controllers\RiskManagementController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -37,4 +38,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/trading/orders', [TradingController::class, 'createOrder']);
     Route::put('/trading/orders/{id}', [TradingController::class, 'updateOrder']);
     Route::delete('/trading/orders/{id}', [TradingController::class, 'cancelOrder']);
+
+    // Risk Management API Routes
+    Route::post('/risk-management/calculate-position-size', [RiskManagementController::class, 'calculatePositionSize'])
+        ->name('api.risk.calculatePositionSize');
 });

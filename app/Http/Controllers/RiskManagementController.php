@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Carbon\Carbon;
 
@@ -592,27 +593,41 @@ class RiskManagementController extends Controller
         // Calculate risk amount
         $riskAmount = $accountBalance * ($riskPercentage / 100);
         
-        // Calculate pip value based on currency pair
-        $pipValue = $this->getPipValue($currencyPair);
+        // Get pip size (e.g., 0.0001 or 0.01)
+        $pipSize = $this->getPipSize($currencyPair); // Renamed for clarity
         
-        // Calculate stop loss in pips
-        $stopLossPips = abs($entryPrice - $stopLoss) / $pipValue;
-        
-        // Calculate position size
-        $positionSize = 0;
-        if ($stopLossPips > 0) {
-            $positionSize = $riskAmount / ($stopLossPips * 10); // $10 per pip for 1 standard lot
+        if ($pipSize <= 0) {
+             Log::error("Invalid pip size calculated for pair: {$currencyPair}");
+             return response()->json(['error' => 'Invalid currency pair configuration'], 400);
         }
         
-        // Convert to standard lots (100,000 units)
-        $standardLots = $positionSize;
-        $miniLots = $positionSize * 10; // 1 mini lot = 0.1 standard lot
-        $microLots = $positionSize * 100; // 1 micro lot = 0.01 standard lot
+        // Calculate stop loss in pips
+        $stopLossPips = abs($entryPrice - $stopLoss) / $pipSize;
+        
+        // Get approximate USD value of 1 pip per standard lot
+        $pipValuePerLot = $this->getApproximatePipValuePerLotInUSD($currencyPair, $pipSize);
+        
+        if ($pipValuePerLot <= 0) {
+             Log::error("Invalid pip value per lot calculated for pair: {$currencyPair}");
+             return response()->json(['error' => 'Could not determine pip value for the pair'], 400);
+        }
+        
+        // Calculate position size in standard lots
+        $standardLots = 0;
+        if ($stopLossPips > 0) {
+            // Correct formula: Risk Amount / (Stop Loss in Pips * Value per Pip per Lot)
+            $standardLots = $riskAmount / ($stopLossPips * $pipValuePerLot);
+        }
+        
+        // Convert to other lot sizes and units
+        $miniLots = $standardLots * 10;
+        $microLots = $standardLots * 100;
+        $positionSizeUnits = $standardLots * 100000; // Standard Lot = 100,000 units
         
         return response()->json([
             'riskAmount' => $riskAmount,
             'stopLossPips' => $stopLossPips,
-            'positionSize' => $positionSize * 100000, // In currency units
+            'positionSize' => $positionSizeUnits, // In currency units
             'standardLots' => $standardLots,
             'miniLots' => $miniLots,
             'microLots' => $microLots,
@@ -620,11 +635,17 @@ class RiskManagementController extends Controller
     }
     
     /**
-     * Get pip value for a currency pair.
+     * Get pip size for a currency pair (e.g., 0.0001 or 0.01).
+     * Renamed from getPipValue for clarity
      */
-    private function getPipValue($currencyPair)
+    private function getPipSize($currencyPair)
     {
-        $pipValues = [
+        // JPY pairs typically have 2 decimal places for pip size
+        $isJpyPair = str_contains($currencyPair, 'JPY');
+        $defaultPipSize = $isJpyPair ? 0.01 : 0.0001;
+        
+        // You might have a more robust way to get this from config or DB
+        $pipSizes = [
             'EUR/USD' => 0.0001,
             'GBP/USD' => 0.0001,
             'USD/JPY' => 0.01,
@@ -635,8 +656,64 @@ class RiskManagementController extends Controller
             'EUR/GBP' => 0.0001,
             'EUR/JPY' => 0.01,
             'GBP/JPY' => 0.01,
+            // Add other pairs as needed
         ];
         
-        return $pipValues[$currencyPair] ?? 0.0001; // Default to 0.0001 if not found
+        return $pipSizes[$currencyPair] ?? $defaultPipSize;
+    }
+    
+    /**
+     * Get the approximate monetary value (in USD) of 1 pip for 1 standard lot.
+     * NOTE: Uses approximate exchange rates. Fetching live rates is better for production.
+     */
+    private function getApproximatePipValuePerLotInUSD($currencyPair, $pipSize)
+    {
+        $lotSizeUnits = 100000;
+        $parts = explode('/', $currencyPair);
+        if (count($parts) !== 2) {
+            return 0; // Invalid pair format
+        }
+        $baseCurrency = $parts[0];
+        $quoteCurrency = $parts[1];
+        
+        // Approximate current exchange rates (replace with live data ideally)
+        $approxRates = [
+            'USD/JPY' => 155.0, // Example rate
+            'USD/CHF' => 0.91,
+            'USD/CAD' => 1.37,
+            'GBP/USD' => 1.25,
+            'EUR/USD' => 1.07,
+            // Add inverses or other rates as needed for cross calculations
+            'JPY/USD' => 1 / 155.0,
+            'CHF/USD' => 1 / 0.91,
+            'CAD/USD' => 1 / 1.37,
+        ];
+        
+        if ($quoteCurrency === 'USD') {
+            // e.g., EUR/USD - Pip value is fixed at $10 for 0.0001 pip size
+            return $pipSize * $lotSizeUnits;
+        } elseif ($baseCurrency === 'USD') {
+            // e.g., USD/JPY - Need the current rate to convert pip value to USD
+            $rate = $approxRates[$currencyPair] ?? null;
+            if ($rate && $rate > 0) {
+                return ($pipSize * $lotSizeUnits) / $rate;
+            }
+        } else {
+            // Cross pair, e.g., EUR/GBP - Need Quote/USD rate
+            $quoteToUsdPair = $quoteCurrency . '/USD';
+            $rate = $approxRates[$quoteToUsdPair] ?? null;
+            
+            // Handle JPY quote specifically if needed (JPY/USD approx 1/150)
+            if ($quoteCurrency === 'JPY') {
+                 $rate = $approxRates['JPY/USD'] ?? (1 / 155.0); // Use direct approx rate
+            }
+            
+            if ($rate && $rate > 0) {
+                return ($pipSize * $lotSizeUnits) * $rate;
+            }
+        }
+        
+        Log::warning("Could not determine approximate pip value in USD for pair: {$currencyPair}");
+        return 0; // Indicate failure
     }
 }

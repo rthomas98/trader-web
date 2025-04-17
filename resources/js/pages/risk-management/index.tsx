@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -104,7 +104,16 @@ export default function RiskManagement({
   drawdownAlerts,
   activeWallet,
 }: RiskManagementProps) {
-  const [activeTab, setActiveTab] = useState('position-sizing');
+  const page = usePage();
+  const url = new URL(page.url, window.location.origin); // Create full URL object
+  const tabParam = url.searchParams.get('tab');
+
+  const validTabs = ['position-sizing', 'risk-reward', 'risk-metrics'];
+  const initialTab = tabParam && validTabs.includes(tabParam)
+                     ? tabParam
+                     : 'position-sizing'; // Default to 'position-sizing'
+
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
