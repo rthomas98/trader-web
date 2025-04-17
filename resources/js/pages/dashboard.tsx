@@ -4,6 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowDown, ArrowUp, DollarSign, LineChart, Newspaper, Calendar } from 'lucide-react';
 import RecentTrades, { Trade } from '@/components/portfolio/recent-trades';
+import RiskManagementSummary from '@/components/dashboard/risk-management-summary';
 
 // Define types for the props
 interface Wallet {
@@ -94,7 +95,6 @@ interface PlaidAccount {
 
 interface DashboardProps {
   wallets: Wallet[];
-  totalBalance: number;
   tradingPositions: TradingPosition[];
   portfolioPositions: PortfolioPosition[];
   latestNews: MarketNews[];
@@ -103,6 +103,13 @@ interface DashboardProps {
   accountSummary: AccountSummary;
   plaidAccounts: PlaidAccount[];
   recentTrades: Trade[];
+  riskManagement?: {
+    currentDrawdown: number;
+    currentDrawdownPercentage: number;
+    maxAllowedDrawdown: number;
+    riskToleranceLevel: 'conservative' | 'moderate' | 'aggressive';
+    alertCount: number;
+  };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -127,7 +134,6 @@ const formatPercentage = (value: number) => {
 
 export default function Dashboard({
   wallets,
-  totalBalance,
   tradingPositions,
   portfolioPositions,
   latestNews,
@@ -136,6 +142,7 @@ export default function Dashboard({
   accountSummary,
   plaidAccounts,
   recentTrades,
+  riskManagement,
 }: DashboardProps) {
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -198,10 +205,10 @@ export default function Dashboard({
           <RecentTrades trades={recentTrades} />
         </div>
 
-        {/* Trading Positions & Portfolio */}
-        <div className="grid gap-4 md:grid-cols-2">
+        {/* Trading & Portfolio */}
+        <div className="grid gap-4 md:grid-cols-3">
           {/* Trading Positions */}
-          <Card className="col-span-1">
+          <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Trading Positions</CardTitle>
               <CardDescription>Your active trading positions</CardDescription>
@@ -214,14 +221,12 @@ export default function Dashboard({
                       <div>
                         <div className="font-medium">{position.currency_pair}</div>
                         <div className="text-sm text-muted-foreground">
-                          {position.trade_type} • {position.quantity} units
+                          {position.quantity} lots • {position.trade_type}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`font-medium ${position.profit_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {formatCurrency(position.profit_loss)}
-                        </div>
-                        <div className={`text-sm ${position.profit_loss_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        <div className="font-medium">{formatCurrency(position.current_price)}</div>
+                        <div className={`text-sm ${position.profit_loss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                           {formatPercentage(position.profit_loss_percentage)}
                         </div>
                       </div>
@@ -236,39 +241,57 @@ export default function Dashboard({
             </CardContent>
           </Card>
 
-          {/* Portfolio Positions */}
-          <Card className="col-span-1">
-            <CardHeader>
-              <CardTitle>Portfolio</CardTitle>
-              <CardDescription>Your investment portfolio</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {portfolioPositions && portfolioPositions.length > 0 ? (
-                <div className="space-y-4">
-                  {portfolioPositions.map((position) => (
-                    <div key={position.id} className="flex items-center justify-between border-b pb-2">
-                      <div>
-                        <div className="font-medium">{position.symbol}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {position.quantity} shares • Avg {formatCurrency(position.average_price)}
+          {/* Risk Management Summary */}
+          {riskManagement ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Risk Management</CardTitle>
+                <CardDescription>Current risk status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RiskManagementSummary 
+                  currentDrawdown={riskManagement.currentDrawdown}
+                  currentDrawdownPercentage={riskManagement.currentDrawdownPercentage}
+                  maxAllowedDrawdown={riskManagement.maxAllowedDrawdown}
+                  riskToleranceLevel={riskManagement.riskToleranceLevel}
+                  alertCount={riskManagement.alertCount}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Portfolio</CardTitle>
+                <CardDescription>Your investment portfolio</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {portfolioPositions && portfolioPositions.length > 0 ? (
+                  <div className="space-y-4">
+                    {portfolioPositions.map((position) => (
+                      <div key={position.id} className="flex items-center justify-between border-b pb-2">
+                        <div>
+                          <div className="font-medium">{position.symbol}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {position.quantity} shares • Avg {formatCurrency(position.average_price)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{formatCurrency(position.current_value)}</div>
+                          <div className={`text-sm ${position.profit_loss_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {formatPercentage(position.profit_loss_percentage)}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-medium">{formatCurrency(position.current_value)}</div>
-                        <div className={`text-sm ${position.profit_loss_percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {formatPercentage(position.profit_loss_percentage)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground">
-                  No portfolio positions
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No portfolio positions
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Plaid Linked Accounts */}

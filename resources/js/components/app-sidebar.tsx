@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, History, Briefcase, BarChart2, type LucideIcon } from 'lucide-react';
+import { BookOpen, Folder, LayoutGrid, Wallet, CreditCard, ArrowLeftRight, PiggyBank, LineChart, History, Briefcase, BarChart2, Shield, Calculator, Activity, AlertTriangle, BookText, PenLine, type LucideIcon } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems = [
@@ -36,6 +36,43 @@ const mainNavItems = [
         title: 'Trade History',
         href: '/trading/history',
         icon: History as LucideIcon,
+      },
+    ],
+  },
+  {
+    title: 'Risk Management',
+    icon: Shield as LucideIcon,
+    children: [
+      {
+        title: 'Risk Dashboard',
+        href: '/risk-management',
+        icon: Activity as LucideIcon,
+      },
+      {
+        title: 'Position Sizing',
+        href: '/risk-management?tab=position-sizing',
+        icon: Calculator as LucideIcon,
+      },
+      {
+        title: 'Drawdown Alerts',
+        href: '/risk-management?tab=drawdown-alerts',
+        icon: AlertTriangle as LucideIcon,
+      },
+    ],
+  },
+  {
+    title: 'Trading Journal',
+    icon: BookText as LucideIcon,
+    children: [
+      {
+        title: 'Journal Entries',
+        href: '/trading-journal',
+        icon: BookText as LucideIcon,
+      },
+      {
+        title: 'Create Entry',
+        href: '/trading-journal/create',
+        icon: PenLine as LucideIcon,
       },
     ],
   },

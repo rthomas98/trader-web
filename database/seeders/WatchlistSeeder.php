@@ -22,8 +22,23 @@ class WatchlistSeeder extends Seeder
             $user = User::factory()->create(); // Create a user if the table is empty
         }
 
-        // Create 5 watchlist items for the user
-        // Ensure unique symbols by using the factory's unique faker modifier
-        Watchlist::factory()->count(5)->for($user)->create();
+        $symbolsToAdd = ['EUR/USD', 'GBP/JPY', 'AUD/CAD', 'USD/CHF', 'NZD/USD', 'EUR/AUD', 'GBP/USD']; // Define a list of symbols
+        $addedCount = 0;
+        $maxToAdd = 5; // Target number of watchlist items
+
+        foreach ($symbolsToAdd as $symbol) {
+            if ($addedCount >= $maxToAdd) {
+                break;
+            }
+
+            Watchlist::firstOrCreate(
+                ['user_id' => $user->id, 'symbol' => $symbol] // Attributes to find
+                // No additional attributes needed here unless the factory sets specific defaults you want
+            );
+            $addedCount++;
+        }
+
+        // Optional: If you need exactly 5 and the list wasn't enough,
+        // you could add more symbols or logic here.
     }
 }

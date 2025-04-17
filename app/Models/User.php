@@ -11,6 +11,8 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Transaction;
 use App\Models\Watchlist;
+use App\Models\TradingJournal;
+use App\Models\JournalComment;
 
 class User extends Authenticatable
 {
@@ -32,6 +34,8 @@ class User extends Authenticatable
         'risk_percentage',
         'trading_account_type',
         'demo_mode_enabled',
+        'max_drawdown_percentage',
+        'risk_tolerance_level',
     ];
 
     /**
@@ -58,6 +62,8 @@ class User extends Authenticatable
             'available_margin' => 'decimal:2',
             'leverage' => 'integer',
             'risk_percentage' => 'decimal:2',
+            'max_drawdown_percentage' => 'decimal:2',
+            'risk_tolerance_level' => 'string',
             'trading_account_type' => 'string',
             'demo_mode_enabled' => 'boolean',
         ];
@@ -158,5 +164,21 @@ class User extends Authenticatable
     public function watchlists(): HasMany
     {
         return $this->hasMany(Watchlist::class);
+    }
+
+    /**
+     * Get the trading journal entries for the user.
+     */
+    public function tradingJournals(): HasMany
+    {
+        return $this->hasMany(TradingJournal::class);
+    }
+
+    /**
+     * Get the journal comments created by the user.
+     */
+    public function journalComments(): HasMany
+    {
+        return $this->hasMany(JournalComment::class);
     }
 }

@@ -9,6 +9,8 @@ use Database\Seeders\TradingDataSeeder;
 use Database\Seeders\TradingPositionSeeder;
 use Database\Seeders\TradingWalletSeeder;
 use Database\Seeders\WatchlistSeeder;
+use Database\Seeders\RiskManagementSeeder;
+use Database\Seeders\JournalEntrySeeder;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -33,13 +35,15 @@ class DatabaseSeeder extends Seeder
             ]
         );
         
-        // Seed dashboard data
+        // Uncomment the other seeders
         $this->call([
             DashboardSeeder::class,
             TradingDataSeeder::class,
             TradingWalletSeeder::class,
             TradingPositionSeeder::class,
             WatchlistSeeder::class,
+            RiskManagementSeeder::class,
+            JournalEntrySeeder::class,
         ]);
     }
 }

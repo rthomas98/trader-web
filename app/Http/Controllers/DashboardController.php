@@ -7,6 +7,7 @@ use App\Models\EconomicCalendar;
 use App\Models\PortfolioPosition;
 use App\Models\TradingPosition;
 use App\Models\Wallet;
+use App\Http\Controllers\RiskManagementController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -101,6 +102,28 @@ class DashboardController extends Controller
 
         // Fetch Plaid account data (placeholder)
         $plaidAccounts = []; // TODO: Replace with actual Plaid data fetching logic
+        
+        // Get risk management data
+        $riskManagementData = null;
+        if ($user->risk_percentage) {
+            try {
+                $riskController = new RiskManagementController();
+                $drawdownAlerts = $riskController->getDrawdownAlerts($user->id);
+                
+                if (isset($drawdownAlerts['currentDrawdown']) && isset($drawdownAlerts['currentDrawdownPercentage'])) {
+                    $riskManagementData = [
+                        'currentDrawdown' => $drawdownAlerts['currentDrawdown'],
+                        'currentDrawdownPercentage' => $drawdownAlerts['currentDrawdownPercentage'],
+                        'maxAllowedDrawdown' => $user->max_drawdown_percentage ?? 20,
+                        'riskToleranceLevel' => $user->risk_tolerance_level ?? 'moderate',
+                        'alertCount' => count($drawdownAlerts['alerts'] ?? []),
+                    ];
+                }
+            } catch (\Exception $e) {
+                // Log the error but don't break the dashboard
+                \Log::error('Error fetching risk management data: ' . $e->getMessage());
+            }
+        }
 
         return Inertia::render('dashboard', [
             'wallets' => $wallets,
@@ -118,6 +141,7 @@ class DashboardController extends Controller
             ],
             'plaidAccounts' => $plaidAccounts, // Pass Plaid data to the view
             'recentTrades' => $recentTrades, // Pass recent trades to the view
+            'riskManagement' => $riskManagementData, // Pass risk management data to the view
         ]);
     }
     

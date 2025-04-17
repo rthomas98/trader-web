@@ -4,10 +4,15 @@ use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\ConnectedAccountController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FundingController;
+use App\Http\Controllers\JournalCommentController;
+use App\Http\Controllers\JournalEntryController;
 use App\Http\Controllers\MarketDataController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PortfolioController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RiskManagementController;
 use App\Http\Controllers\TradingController;
+use App\Http\Controllers\TradingJournalController;
 use App\Http\Controllers\WalletController;
 use App\Http\Middleware\EnsureOnboardingComplete;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +46,36 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
     // Analytics route
     Route::get('analytics', [AnalyticsController::class, 'index'])->name('analytics.index');
 
+    // Risk Management routes
+    Route::get('/risk-management', [RiskManagementController::class, 'index'])
+        ->middleware(['auth', 'verified'])
+        ->name('risk-management');
+        
+    Route::post('/risk-management/update-settings', [RiskManagementController::class, 'updateRiskSettings'])
+        ->middleware(['auth', 'verified'])
+        ->name('risk-management.update-settings');
+        
+    Route::post('/api/risk-management/calculate-position-size', [RiskManagementController::class, 'calculatePositionSize'])
+        ->middleware(['auth', 'verified'])
+        ->name('risk-management.calculate-position-size');
+
+    // Trading Journal routes
+    Route::prefix('trading-journal')->middleware(['auth', 'verified'])->group(function () {
+        Route::get('/', [TradingJournalController::class, 'index'])->name('trading-journal.index');
+        Route::get('/create', [TradingJournalController::class, 'create'])->name('trading-journal.create');
+        Route::post('/', [TradingJournalController::class, 'store'])->name('trading-journal.store');
+        Route::get('/{id}', [TradingJournalController::class, 'show'])->name('trading-journal.show');
+        Route::get('/{id}/edit', [TradingJournalController::class, 'edit'])->name('trading-journal.edit');
+        Route::put('/{id}', [TradingJournalController::class, 'update'])->name('trading-journal.update');
+        Route::delete('/{id}', [TradingJournalController::class, 'destroy'])->name('trading-journal.destroy');
+        Route::post('/{id}/favorite', [TradingJournalController::class, 'toggleFavorite'])->name('trading-journal.favorite');
+        
+        // Journal Comment routes
+        Route::post('/{journalId}/comments', [JournalCommentController::class, 'store'])->name('journal-comments.store');
+        Route::put('/{journalId}/comments/{commentId}', [JournalCommentController::class, 'update'])->name('journal-comments.update');
+        Route::delete('/{journalId}/comments/{commentId}', [JournalCommentController::class, 'destroy'])->name('journal-comments.destroy');
+    });
+        
     // Wallet routes
     Route::resource('wallets', WalletController::class);
     Route::post('wallets/{id}/deposit', [WalletController::class, 'deposit'])->name('wallets.deposit');
@@ -84,6 +119,9 @@ Route::middleware(['auth', 'verified', EnsureOnboardingComplete::class])->group(
     Route::get('market-data/news', [MarketDataController::class, 'news'])->name('market-data.news');
     Route::get('market-data/calendar', [MarketDataController::class, 'calendar'])->name('market-data.calendar');
     Route::get('market-data/symbol/{symbol}', [MarketDataController::class, 'symbol'])->name('market-data.symbol');
+
+    // Journal Entry routes
+    Route::resource('journal-entries', JournalEntryController::class);
 });
 
 // Debug routes
