@@ -10,34 +10,16 @@ import { UserPlus, UserCheck, LineChart, BarChart2, TrendingUp, Percent, Copy, A
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
 import axios from 'axios';
-import ReactApexChart from 'react-apexcharts';
-import { ApexOptions } from 'apexcharts';
-import { StrategyCard } from '@/components/SocialTrading/StrategyCard';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Slider } from "@/components/ui/slider";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+import { StrategyCard } from '@/components/SocialTrading/StrategyCard';
 
 interface TraderStats {
   followers_count: number;
@@ -77,91 +59,11 @@ interface TraderProfileProps {
   };
 }
 
-// Helper function to get chart options compatible with dark/light mode
-const getChartOptions = (isDarkMode: boolean): ApexOptions => ({
-  chart: {
-    type: 'area',
-    height: 350,
-    zoom: {
-      enabled: false
-    },
-    toolbar: {
-      show: false
-    },
-    foreColor: isDarkMode ? '#f9f9f9' : '#1A161D', // Text color based on mode
-    background: 'transparent' // Ensure transparent background
-  },
-  dataLabels: {
-    enabled: false
-  },
-  stroke: {
-    curve: 'smooth',
-    width: 2
-  },
-  xaxis: {
-    type: 'datetime',
-    axisBorder: {
-      color: isDarkMode ? '#444' : '#e0e0e0'
-    },
-    axisTicks: {
-      color: isDarkMode ? '#444' : '#e0e0e0'
-    }
-  },
-  yaxis: {
-    labels: {
-      formatter: function (val) {
-        return "$" + val.toFixed(2);
-      }
-    },
-    opposite: false
-  },
-  grid: {
-    borderColor: isDarkMode ? '#444' : '#e0e0e0',
-    strokeDashArray: 4,
-    yaxis: {
-      lines: {
-        show: true
-      }
-    },
-    xaxis: {
-      lines: {
-        show: true
-      }
-    } 
-  },
-  tooltip: {
-    x: {
-      format: 'dd MMM yyyy HH:mm'
-    },
-    y: {
-      formatter: function (val) {
-        return "$" + val.toFixed(2);
-      }
-    },
-    theme: isDarkMode ? 'dark' : 'light'
-  },
-  fill: {
-    type: 'gradient',
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.7,
-      opacityTo: 0.9,
-      stops: [0, 100]
-    }
-  },
-  colors: ['#8D5EB7'] // Use brand color
-});
-
 export default function TraderProfile({ auth, breadcrumbs, trader, isFollowing }: TraderProfileProps) {
   const [following, setFollowing] = useState(isFollowing);
   const [isLoading, setIsLoading] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isCopyingLoading, setIsCopyingLoading] = useState(false);
-
-  // Assuming you have a way to detect dark mode, e.g., from a context or theme setting
-  // Replace this with your actual dark mode detection logic
-  const isDarkMode = document.documentElement.classList.contains('dark'); 
-  const chartOptions = getChartOptions(isDarkMode);
 
   const handleFollow = async () => {
     setIsLoading(true);
@@ -180,7 +82,6 @@ export default function TraderProfile({ auth, breadcrumbs, trader, isFollowing }
     }
   };
 
-  // Define the form schema for copy trading settings
   const copyTradingFormSchema = z.object({
     trader_user_id: z.number(),
     risk_allocation_percentage: z.number().min(0.01).max(100),
@@ -191,21 +92,19 @@ export default function TraderProfile({ auth, breadcrumbs, trader, isFollowing }
     copy_take_profit: z.boolean(),
   });
 
-  // Create the form
   const copyTradingForm = useForm<z.infer<typeof copyTradingFormSchema>>({
     resolver: zodResolver(copyTradingFormSchema),
     defaultValues: {
       trader_user_id: trader.id,
-      risk_allocation_percentage: 50, // Default to 50% risk allocation
-      max_drawdown_percentage: 20, // Default to 20% max drawdown
-      copy_fixed_size: false, // Default to proportional sizing
-      fixed_lot_size: 0.1, // Default lot size if fixed sizing is enabled
-      copy_stop_loss: true, // Default to copying stop loss
-      copy_take_profit: true, // Default to copying take profit
+      risk_allocation_percentage: 50, 
+      max_drawdown_percentage: 20, 
+      copy_fixed_size: false, 
+      fixed_lot_size: 0.1, 
+      copy_stop_loss: true, 
+      copy_take_profit: true, 
     },
   });
 
-  // Handle form submission
   const onSubmitCopyTradingForm = async (values: z.infer<typeof copyTradingFormSchema>) => {
     setIsCopyingLoading(true);
     try {
@@ -560,12 +459,8 @@ export default function TraderProfile({ auth, breadcrumbs, trader, isFollowing }
                 <CardDescription>Account equity curve over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <ReactApexChart 
-                  options={chartOptions}
-                  series={trader.performanceChartData.series} 
-                  type="area" 
-                  height={350} 
-                />
+                {/* <ReactApexChart options={chartOptions} series={trader.performanceChartData.series} type="area" height={350} /> */}
+                <p className="text-muted-foreground">Performance chart placeholder.</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -577,18 +472,13 @@ export default function TraderProfile({ auth, breadcrumbs, trader, isFollowing }
                 <CardDescription>Equity curve showing profit/loss over time.</CardDescription>
               </CardHeader>
               <CardContent>
-                {trader.performanceChartData && trader.performanceChartData.series[0]?.data.length > 0 ? (
-                  <ReactApexChart 
-                    options={chartOptions}
-                    series={trader.performanceChartData.series} 
-                    type="area" 
-                    height={350} 
-                  />
-                ) : (
+                {/* {trader.performanceChartData && trader.performanceChartData.series[0]?.data.length > 0 ? (
+                  <ReactApexChart options={chartOptions} series={trader.performanceChartData.series} type="area" height={350} />
+                ) : ( */}
                   <div className="h-80 w-full bg-muted flex items-center justify-center rounded-md">
                     <span className="text-muted-foreground">No performance data available.</span>
                   </div>
-                )}
+                {/* )} */}
               </CardContent>
             </Card>
           </TabsContent>

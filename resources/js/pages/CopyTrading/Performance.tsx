@@ -11,8 +11,6 @@ import {
   Percent, DollarSign, Clock, ArrowLeft
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import ReactApexChart from 'react-apexcharts';
-import { ApexOptions } from 'apexcharts';
 import {
   Table,
   TableBody,
@@ -89,119 +87,43 @@ interface PerformancePageProps {
   };
 }
 
-// Helper function to get chart options compatible with dark/light mode
-const getChartOptions = (isDarkMode: boolean): ApexOptions => ({
-  chart: {
-    type: 'area',
-    height: 350,
-    zoom: {
-      enabled: false
-    },
-    toolbar: {
-      show: false
-    },
-    foreColor: isDarkMode ? '#f9f9f9' : '#1A161D', // Text color based on mode
-    background: 'transparent' // Ensure transparent background
-  },
-  dataLabels: {
-    enabled: false
-  },
-  stroke: {
-    curve: 'smooth',
-    width: 2
-  },
-  xaxis: {
-    type: 'datetime',
-    axisBorder: {
-      color: isDarkMode ? '#444' : '#e0e0e0'
-    },
-    axisTicks: {
-      color: isDarkMode ? '#444' : '#e0e0e0'
-    }
-  },
-  yaxis: {
-    labels: {
-      formatter: function (val) {
-        return "$" + val.toFixed(2);
-      }
-    },
-    opposite: false
-  },
-  grid: {
-    borderColor: isDarkMode ? '#444' : '#e0e0e0',
-    strokeDashArray: 4,
-    yaxis: {
-      lines: {
-        show: true
-      }
-    },
-    xaxis: {
-      lines: {
-        show: true
-      }
-    } 
-  },
-  tooltip: {
-    x: {
-      format: 'dd MMM yyyy HH:mm'
-    },
-    y: {
-      formatter: function (val) {
-        return "$" + val.toFixed(2);
-      }
-    },
-    theme: isDarkMode ? 'dark' : 'light'
-  },
-  fill: {
-    type: 'gradient',
-    gradient: {
-      shadeIntensity: 1,
-      opacityFrom: 0.7,
-      opacityTo: 0.9,
-      stops: [0, 100]
-    }
-  },
-  colors: ['#8D5EB7'] // Use brand color
-});
+// Helper function to format date
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+// Helper function to format currency
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+};
+
+// Helper function to get status badge variant
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'active':
+      return <Badge className="bg-green-500">Active</Badge>;
+    case 'paused':
+      return <Badge variant="outline" className="text-amber-500 border-amber-500">Paused</Badge>;
+    case 'stopped':
+      return <Badge variant="outline" className="text-red-500 border-red-500">Stopped</Badge>;
+    default:
+      return <Badge variant="outline">Unknown</Badge>;
+  }
+};
 
 export default function CopyTradingPerformance({ auth, breadcrumbs, relationship, performanceData }: PerformancePageProps) {
   // Assuming you have a way to detect dark mode, e.g., from a context or theme setting
   const isDarkMode = document.documentElement.classList.contains('dark'); 
-  const chartOptions = getChartOptions(isDarkMode);
   
-  // Helper function to format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-  
-  // Helper function to format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-  
-  // Helper function to get status badge variant
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-green-500">Active</Badge>;
-      case 'paused':
-        return <Badge variant="outline" className="text-amber-500 border-amber-500">Paused</Badge>;
-      case 'stopped':
-        return <Badge variant="outline" className="text-red-500 border-red-500">Stopped</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>;
-    }
-  };
-
   return (
     <AppLayout
       user={auth.user}
@@ -352,18 +274,13 @@ export default function CopyTradingPerformance({ auth, breadcrumbs, relationship
                 <CardDescription>Performance over time</CardDescription>
               </CardHeader>
               <CardContent>
-                {performanceData.equity_curve.series[0]?.data.length > 0 ? (
-                  <ReactApexChart 
-                    options={chartOptions}
-                    series={performanceData.equity_curve.series} 
-                    type="area" 
-                    height={350} 
-                  />
-                ) : (
-                  <div className="h-80 w-full bg-muted flex items-center justify-center rounded-md">
-                    <span className="text-muted-foreground">No performance data available yet.</span>
-                  </div>
-                )}
+                {/* <ReactApexChart 
+                  options={chartOptions}
+                  series={performanceData.equity_curve.series} 
+                  type="area" 
+                  height={350} 
+                /> */}
+                <p className="text-muted-foreground">Equity curve placeholder.</p>
               </CardContent>
             </Card>
           </TabsContent>

@@ -2,19 +2,18 @@ import React, { useState } from 'react';
 import { Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  Star, TrendingUp, Users, ArrowUpRight, ArrowDownRight, 
-  Search, Filter, ChartBar, Calendar, Wallet, Shield 
+  TrendingUp, Users, ArrowUpRight, ArrowDownRight, 
+  Search, Shield
 } from 'lucide-react';
 import { Link } from '@inertiajs/react';
-import { route } from '@/ziggy';
 import { toast } from 'sonner';
 import axios from 'axios';
 

@@ -12,9 +12,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-// Import ApexCharts with a lazy-loading approach for client-side only
-import { lazy, Suspense } from 'react';
-const ReactApexChart = lazy(() => import('react-apexcharts'));
+// import { ApexOptions } from 'apexcharts'; // Removed as ApexCharts is no longer used
+// import ReactApexChart from 'react-apexcharts'; // Removed as ApexCharts is no longer used
 
 // Define the data structure for performance analytics
 export interface PerformanceData {
@@ -326,12 +325,7 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({ data }) => {
   const filteredCumulativePnL = filterDataByTimeRange(data.cumulativePnL.dates, data.cumulativePnL.values);
   
   // Prepare benchmark data if available and enabled
-  const benchmarkSeries: Array<{
-    name: string;
-    data: number[];
-    type: string;
-    color: string;
-  }> = [];
+  const benchmarkSeries = [];
   if (showBenchmarks && data.benchmarks) {
     if (data.benchmarks.spx) {
       const filteredSpx = filterDataByTimeRange(
@@ -791,89 +785,59 @@ const PerformanceCharts: React.FC<PerformanceChartsProps> = ({ data }) => {
           
           <TabsContent value="daily" className="mt-4">
             <div className="h-[400px] w-full">
-              <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-              </div>}>
-                {typeof window !== 'undefined' && (
-                  <ReactApexChart
-                    options={dailyPnLOptions}
-                    series={[{ name: 'Daily P&L', data: filteredDailyPnL.values }]}
-                    type="bar"
-                    height={400}
-                  />
-                )}
-              </Suspense>
+              {/* <ReactApexChart
+                options={dailyPnLOptions}
+                series={[{ name: 'Daily P&L', data: filteredDailyPnL.values }]}
+                type="bar"
+                height={400}
+              /> */}
             </div>
           </TabsContent>
           
           <TabsContent value="cumulative" className="mt-4">
             <div className="h-[400px] w-full">
-              <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-              </div>}>
-                {typeof window !== 'undefined' && (
-                  <ReactApexChart
-                    options={cumulativePnLOptions}
-                    series={[
-                      { name: 'Your P&L', data: filteredCumulativePnL.values },
-                      ...benchmarkSeries
-                    ]}
-                    type="area"
-                    height={400}
-                  />
-                )}
-              </Suspense>
+              {/* <ReactApexChart
+                options={cumulativePnLOptions}
+                series={[
+                  { name: 'Your P&L', data: filteredCumulativePnL.values },
+                  ...benchmarkSeries
+                ]}
+                type="area"
+                height={400}
+              /> */}
             </div>
           </TabsContent>
           
           <TabsContent value="winloss" className="mt-4">
             <div className="h-[400px] w-full">
-              <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-              </div>}>
-                {typeof window !== 'undefined' && (
-                  <ReactApexChart
-                    options={winLossOptions}
-                    series={data.winLossRatio.values}
-                    type="pie"
-                    height={400}
-                  />
-                )}
-              </Suspense>
+              {/* <ReactApexChart
+                options={winLossOptions}
+                series={data.winLossRatio.values}
+                type="pie"
+                height={400}
+              /> */}
             </div>
           </TabsContent>
           
           <TabsContent value="volume" className="mt-4">
             <div className="h-[400px] w-full">
-              <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-              </div>}>
-                {typeof window !== 'undefined' && (
-                  <ReactApexChart
-                    options={tradeVolumeOptions}
-                    series={[{ name: 'Trade Volume', data: filteredTradeVolume.values }]}
-                    type="bar"
-                    height={400}
-                  />
-                )}
-              </Suspense>
+              {/* <ReactApexChart
+                options={tradeVolumeOptions}
+                series={[{ name: 'Trade Volume', data: filteredTradeVolume.values }]}
+                type="bar"
+                height={400}
+              /> */}
             </div>
           </TabsContent>
           
           <TabsContent value="assets" className="mt-4">
             <div className="h-[400px] w-full">
-              <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-              </div>}>
-                {typeof window !== 'undefined' && (
-                  <ReactApexChart
-                    options={assetPerformanceOptions}
-                    series={[{ name: 'Performance', data: data.assetPerformance.performance }]}
-                    type="bar"
-                    height={400}
-                  />
-                )}
-              </Suspense>
+              {/* <ReactApexChart
+                options={assetPerformanceOptions}
+                series={[{ name: 'Performance', data: data.assetPerformance.performance }]}
+                type="bar"
+                height={400}
+              /> */}
             </div>
           </TabsContent>
         </Tabs>

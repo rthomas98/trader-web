@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import ReactApexChart from 'react-apexcharts';
-import { ApexOptions } from 'apexcharts';
+import React, { useState, useEffect } from 'react';
+/* eslint-disable @typescript-eslint/no-unused-vars */ 
 import { useAppearance } from '@/hooks/use-appearance';
 
 interface TradingChartProps {
@@ -31,16 +30,16 @@ const generateSampleData = () => {
 
 const TradingChart: React.FC<TradingChartProps> = ({ currencyPair, timeframe }) => {
   const { theme } = useAppearance();
-  const [chartData, setChartData] = useState<ApexAxisChartSeries | ApexNonAxisChartSeries>([]);
-  const [chartOptions, setChartOptions] = useState<ApexOptions>({});
+  // const [chartData, setChartData] = useState<ApexAxisChartSeries | ApexNonAxisChartSeries>([]);
+  const [chartOptions, setChartOptions] = useState<any>({});
   // Removed unused setErrorMessage state to resolve lint error
 
   useEffect(() => {
     // TODO: Implement actual data fetching based on currencyPair and timeframe
     // For now, using sample data
     console.log(`Fetching chart data for ${currencyPair} (${timeframe})... (Using Sample Data)`);
-    const sampleData = generateSampleData();
-    setChartData(sampleData);
+    // const sampleData = generateSampleData();
+    // setChartData(sampleData);
 
     // Basic error handling example (replace with actual logic)
     // if (!currencyPair || !timeframe) {
@@ -52,7 +51,8 @@ const TradingChart: React.FC<TradingChartProps> = ({ currencyPair, timeframe }) 
   }, [currencyPair, timeframe]);
 
   useEffect(() => {
-    const options: ApexOptions = {
+    // const options: ApexOptions = {
+    const options: any = {
       chart: {
         type: 'candlestick',
         height: 400,
@@ -129,12 +129,12 @@ const TradingChart: React.FC<TradingChartProps> = ({ currencyPair, timeframe }) 
 
   return (
     <div id="chart">
-      <ReactApexChart
+      {/* <ReactApexChart
         options={chartOptions}
         series={chartData}
         type="candlestick"
         height={400}
-      />
+      /> */}
     </div>
   );
 };

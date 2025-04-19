@@ -20,9 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Terminal, Loader2 } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider'; 
-import Chart from 'react-apexcharts'; 
-import { ApexOptions } from 'apexcharts'; 
-
+ 
 // --- Type Definitions ---
 interface Trade {
     type: 'buy' | 'sell';
@@ -71,16 +69,14 @@ export default function StrategyBacktestingIndex({ auth, breadcrumbs }: Strategy
     const [initialCapital, setInitialCapital] = useState<string>('10000');
     const [isLoading, setIsLoading] = useState(false);
     const [results, setResults] = useState<BacktestResults | null>(null);
-    const [chartOptions, setChartOptions] = useState<ApexOptions>({});
-    const [chartSeries, setChartSeries] = useState<ApexAxisChartSeries>([]);
     const [error, setError] = useState<string | null>(null);
     const { theme } = useTheme(); 
-
+ 
     const handleRunBacktest = () => {
         setIsLoading(true);
         setResults(null);
         setError(null);
-
+ 
         fetch(route('strategy-backtesting.run'), {
             method: 'POST',
             headers: {
@@ -98,10 +94,6 @@ export default function StrategyBacktestingIndex({ auth, breadcrumbs }: Strategy
         })
         .then(data => {
             setResults(data);
-            if (data.status === 'success') {
-                const equityData = calculateEquityCurve(data.trades, data.parameters.initialCapital);
-                updateChartData(equityData, theme);
-            }
         })
         .catch(error => {
             console.error('Error fetching backtest results:', error);
@@ -111,133 +103,22 @@ export default function StrategyBacktestingIndex({ auth, breadcrumbs }: Strategy
             setIsLoading(false);
         });
     };
-
-    const calculateEquityCurve = (trades: Trade[], initialCapitalStr: string): { x: number; y: number }[] => {
-        const initialCapital = parseFloat(initialCapitalStr);
-        let currentEquity = initialCapital;
-        const equityPoints: { x: number; y: number }[] = [];
-
-        const startTime = trades.length > 0 ? new Date(trades[0].entry_timestamp).getTime() : Date.now();
-        equityPoints.push({ x: startTime, y: initialCapital });
-
-        const closedTrades = trades
-            .filter(trade => trade.exit_timestamp && trade.exit_price !== null)
-            .sort((a, b) => new Date(a.exit_timestamp!).getTime() - new Date(b.exit_timestamp!).getTime());
-
-        closedTrades.forEach(trade => {
-            const entryPrice = trade.entry_price;
-            const exitPrice = trade.exit_price!;
-            let profitLoss = 0;
-
-            if (trade.type === 'buy') {
-                profitLoss = exitPrice - entryPrice;
-            } else if (trade.type === 'sell') {
-                profitLoss = entryPrice - exitPrice;
-            }
-
-            currentEquity += profitLoss;
-            equityPoints.push({ x: new Date(trade.exit_timestamp!).getTime(), y: currentEquity });
-        });
-
-        return equityPoints;
-    };
-
-    const updateChartData = (equityData: { x: number; y: number }[], currentTheme: string) => {
-        setChartSeries([{ name: 'Equity', data: equityData }]);
-
-        setChartOptions({
-            chart: {
-                type: 'line',
-                height: 350,
-                zoom: {
-                    enabled: true
-                },
-                toolbar: {
-                    show: true
-                },
-                background: 'transparent'
-            },
-            stroke: {
-                curve: 'smooth',
-                width: 2
-            },
-            xaxis: {
-                type: 'datetime',
-                labels: {
-                    style: {
-                        colors: currentTheme === 'dark' ? '#e2e8f0' : '#000000',
-                    }
-                }
-            },
-            yaxis: {
-                title: {
-                    text: 'Equity (USD)',
-                    style: {
-                        color: currentTheme === 'dark' ? '#e2e8f0' : '#000000',
-                    }
-                },
-                labels: {
-                    formatter: function (value) {
-                        return "$" + value.toFixed(2);
-                    },
-                    style: {
-                        colors: currentTheme === 'dark' ? '#e2e8f0' : '#000000',
-                    }
-                }
-            },
-            tooltip: {
-                x: {
-                    format: 'dd MMM yyyy HH:mm'
-                },
-                y: {
-                    formatter: function (value) {
-                        return "$" + value.toFixed(2);
-                    }
-                },
-                theme: currentTheme
-            },
-            grid: {
-                borderColor: currentTheme === 'dark' ? '#374151' : '#e5e7eb',
-                xaxis: {
-                    lines: {
-                        show: true
-                    }
-                },
-                yaxis: {
-                    lines: {
-                        show: true
-                    }
-                }
-            },
-            noData: {
-                text: 'Not enough data to display equity curve.',
-                style: {
-                    color: currentTheme === 'dark' ? '#e2e8f0' : '#000000',
-                }
-            },
-            theme: {
-                mode: currentTheme as 'light' | 'dark'
-            }
-        });
-    };
-
+ 
     useEffect(() => {
         if (results?.status === 'success') {
-            const equityData = calculateEquityCurve(results.trades, results.parameters.initialCapital);
-            updateChartData(equityData, theme);
         }
     }, [theme, results]);
-
+ 
     return (
         <AppLayout
             user={auth.user}
             header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">Strategy Backtesting</h2>}
         >
             <Head title="Strategy Backtesting" />
-
+ 
             <div className="py-4 px-4 sm:px-6 lg:px-8">
                 <Breadcrumbs breadcrumbs={breadcrumbs} />
-
+ 
                 <div className="mt-6 space-y-6">
                     <Card>
                         <CardHeader>
@@ -306,7 +187,7 @@ export default function StrategyBacktestingIndex({ auth, breadcrumbs }: Strategy
                             </div>
                         </CardContent>
                     </Card>
-
+ 
                     <Card>
                         <CardHeader>
                             <CardTitle>Backtest Results</CardTitle>
@@ -341,7 +222,7 @@ export default function StrategyBacktestingIndex({ auth, breadcrumbs }: Strategy
                                         <MetricItem label="Win Rate" value={`${results.performance.winRate.toFixed(2)}%`} />
                                         <MetricItem label="Data Points Used" value={results.data_points_fetched} />
                                     </div>
-
+ 
                                     {/* Trades Table Section */}
                                     <h3 className="text-lg font-medium">Trades</h3>
                                     <Table>
@@ -379,16 +260,11 @@ export default function StrategyBacktestingIndex({ auth, breadcrumbs }: Strategy
                                             )}
                                         </TableBody>
                                     </Table>
-
+ 
                                     {/* Equity Curve Chart Section */}
                                     <h3 className="text-lg font-medium">Equity Curve</h3>
                                     <div id="equity-chart">
-                                        <Chart
-                                            options={chartOptions}
-                                            series={chartSeries}
-                                            type="line"
-                                            height={350}
-                                        />
+                                        <p className="text-muted-foreground">Equity curve chart placeholder.</p>
                                     </div>
                                 </div>
                             )}
@@ -406,7 +282,7 @@ export default function StrategyBacktestingIndex({ auth, breadcrumbs }: Strategy
         </AppLayout>
     );
 }
-
+ 
 // Helper component for displaying metrics
 const MetricItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
     <div className="flex flex-col space-y-1">
@@ -414,16 +290,16 @@ const MetricItem: React.FC<{ label: string; value: string | number }> = ({ label
         <p className="font-semibold">{value}</p>
     </div>
 );
-
+ 
 // Formatting helpers
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 };
-
+ 
 const formatPrice = (value: number) => {
     return value.toFixed(5);
 };
-
+ 
 const formatDateTime = (isoString: string) => {
     if (!isoString) return '-';
     try {

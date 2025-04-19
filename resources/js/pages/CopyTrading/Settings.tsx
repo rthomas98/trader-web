@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Head } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { PageProps, User } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,17 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { route } from '@/ziggy';
 import { 
-  Shield, Users, CheckCircle, XCircle, AlertTriangle, 
-  UserPlus, UserMinus, Settings, Bell
+  Shield, Users, CheckCircle, XCircle, 
+  UserPlus, UserMinus, Settings 
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CopyTradingSettings {
   id?: number;
@@ -42,24 +41,27 @@ interface CopyTradingRelationship {
   copier?: User;
 }
 
-interface User {
+interface CopyRelationship {
   id: number;
-  name: string;
-  email: string;
-  profile_photo_path?: string;
+  trader_user_id: number;
+  copier_user_id: number;
+  status: 'active' | 'paused' | 'stopped';
+  approval_status: 'pending' | 'approved' | 'rejected';
+  started_at: string;
+  paused_at: string | null;
+  stopped_at: string | null;
+  trader?: User;
+  copier?: User;
 }
 
-interface CopyTradingSettingsPageProps extends PageProps {
+interface SpecificSettingsProps {
   settings: CopyTradingSettings;
-  pendingRequests: CopyTradingRelationship[];
-  activeCopiers: CopyTradingRelationship[];
-  stats: {
-    totalCopiers: number;
-    pendingRequests: number;
-  };
+  copyRelationships: CopyRelationship[];
 }
 
-export default function CopyTradingSettings({ auth, settings, pendingRequests, activeCopiers, stats }: CopyTradingSettingsPageProps) {
+interface CopyTradingSettingsPageProps extends PageProps<SpecificSettingsProps> {}
+
+export default function CopyTradingSettings({ auth, settings, copyRelationships }: CopyTradingSettingsPageProps) {
   const [isLoading, setIsLoading] = useState<Record<number, boolean>>({});
   const [formData, setFormData] = useState<CopyTradingSettings>(settings);
   const [activeTab, setActiveTab] = useState('settings');
@@ -120,13 +122,6 @@ export default function CopyTradingSettings({ auth, settings, pendingRequests, a
           'Accept': 'application/json',
         }
       });
-      
-      // Remove from pending requests and add to active copiers
-      const updatedRelationship = { 
-        ...relationship, 
-        approval_status: 'approved',
-        status: 'active'
-      };
       
       toast.success(`Approved ${relationship.copier?.name}'s request to copy your trades`);
       
@@ -229,7 +224,7 @@ export default function CopyTradingSettings({ auth, settings, pendingRequests, a
               <CardContent>
                 <div className="flex items-center">
                   <Users className="h-5 w-5 text-muted-foreground mr-2" />
-                  <p className="text-2xl font-bold">{stats.totalCopiers}</p>
+                  <p className="text-2xl font-bold">{copyRelationships.length}</p>
                 </div>
               </CardContent>
             </Card>
@@ -241,7 +236,7 @@ export default function CopyTradingSettings({ auth, settings, pendingRequests, a
               <CardContent>
                 <div className="flex items-center">
                   <UserPlus className="h-5 w-5 text-muted-foreground mr-2" />
-                  <p className="text-2xl font-bold">{stats.pendingRequests}</p>
+                  <p className="text-2xl font-bold">{copyRelationships.filter(r => r.approval_status === 'pending').length}</p>
                 </div>
               </CardContent>
             </Card>
@@ -274,9 +269,9 @@ export default function CopyTradingSettings({ auth, settings, pendingRequests, a
                 <TabsTrigger value="pending" className="relative">
                   <UserPlus className="h-4 w-4 mr-2" />
                   Pending Requests
-                  {pendingRequests.length > 0 && (
+                  {copyRelationships.filter(r => r.approval_status === 'pending').length > 0 && (
                     <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
-                      {pendingRequests.length}
+                      {copyRelationships.filter(r => r.approval_status === 'pending').length}
                     </Badge>
                   )}
                 </TabsTrigger>
@@ -416,13 +411,13 @@ export default function CopyTradingSettings({ auth, settings, pendingRequests, a
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {pendingRequests.length === 0 ? (
+                    {copyRelationships.filter(r => r.approval_status === 'pending').length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-muted-foreground">No pending requests</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {pendingRequests.map((request) => (
+                        {copyRelationships.filter(r => r.approval_status === 'pending').map((request) => (
                           <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg">
                             <div className="flex items-center space-x-4">
                               <Avatar>
@@ -475,13 +470,13 @@ export default function CopyTradingSettings({ auth, settings, pendingRequests, a
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {activeCopiers.length === 0 ? (
+                    {copyRelationships.filter(r => r.status === 'active').length === 0 ? (
                       <div className="text-center py-8">
                         <p className="text-muted-foreground">No active copiers</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {activeCopiers.map((copier) => (
+                        {copyRelationships.filter(r => r.status === 'active').map((copier) => (
                           <div key={copier.id} className="flex items-center justify-between p-4 border rounded-lg">
                             <div className="flex items-center space-x-4">
                               <Avatar>

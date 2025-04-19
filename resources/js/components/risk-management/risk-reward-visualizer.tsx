@@ -9,10 +9,6 @@ import { Info, TrendingUp, BarChart2, PieChart } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 
-// Import ApexCharts with a lazy-loading approach for client-side only
-import { lazy, Suspense } from 'react';
-const ReactApexChart = lazy(() => import('react-apexcharts'));
-
 interface RiskRewardVisualizerProps {
   positionSizing: {
     fixedRisk: Array<{
@@ -96,275 +92,15 @@ const RiskRewardVisualizer: React.FC<RiskRewardVisualizerProps> = ({
 
   const outcomes = calculateOutcomes();
 
-  // Generate data for the expected value chart
-  const generateExpectedValueData = () => {
-    const ratios = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4];
-    const winRates = [30, 40, 50, 60, 70];
-    
-    const series = winRates.map(wr => ({
-      name: `${wr}% Win Rate`,
-      data: ratios.map(r => calculateExpectedValue(r, wr)),
-    }));
-    
-    return {
-      series,
-      options: {
-        chart: {
-          type: 'line',
-          height: 350,
-          toolbar: {
-            show: true,
-          },
-          background: 'transparent',
-        },
-        colors: ['#D04014', '#EECEE6', '#8D5EB7', '#211DE49', '#1A161D'],
-        dataLabels: {
-          enabled: false,
-        },
-        stroke: {
-          curve: 'smooth',
-          width: 2,
-        },
-        grid: {
-          borderColor: '#e5e5e5',
-          row: {
-            colors: ['transparent', 'transparent'],
-            opacity: 0.5,
-          },
-        },
-        markers: {
-          size: 4,
-        },
-        xaxis: {
-          categories: ratios,
-          title: {
-            text: 'Risk-Reward Ratio',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-        },
-        yaxis: {
-          title: {
-            text: 'Expected Value',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-          labels: {
-            formatter: function(value: number) {
-              return value.toFixed(2);
-            },
-          },
-        },
-        legend: {
-          position: 'top',
-          horizontalAlign: 'right',
-          floating: true,
-          offsetY: -25,
-          offsetX: -5,
-        },
-        tooltip: {
-          shared: true,
-          intersect: false,
-          y: {
-            formatter: function(value: number) {
-              return value.toFixed(2);
-            },
-          },
-        },
-        theme: {
-          mode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-        },
-      },
-    };
-  };
+  // Temporary data structure - replace with actual data source
+  const riskRewardData = [
+    // Add data here
+  ];
 
-  // Generate data for the Kelly criterion chart
-  const generateKellyData = () => {
-    const optimalRatio = positionSizing.riskRewardRatios.optimalRatio;
-    const kellyPercentage = positionSizing.riskRewardRatios.kellyPercentage;
-    
-    return {
-      series: [{
-        name: 'Kelly Percentage',
-        data: positionSizing.riskRewardRatios.expectedValues.map(ev => ev.ratio === optimalRatio ? kellyPercentage : kellyPercentage / 2),
-      }],
-      options: {
-        chart: {
-          type: 'bar',
-          height: 350,
-          toolbar: {
-            show: false,
-          },
-          background: 'transparent',
-        },
-        plotOptions: {
-          bar: {
-            borderRadius: 4,
-            dataLabels: {
-              position: 'top',
-            },
-            colors: {
-              ranges: [{
-                from: 0,
-                to: 100,
-                color: '#8D5EB7',
-              }],
-            },
-          },
-        },
-        dataLabels: {
-          enabled: true,
-          formatter: function(val: number) {
-            return val.toFixed(1) + '%';
-          },
-          offsetY: -20,
-          style: {
-            fontSize: '12px',
-            colors: ['#304758'],
-          },
-        },
-        xaxis: {
-          categories: positionSizing.riskRewardRatios.expectedValues.map(ev => ev.ratio),
-          position: 'bottom',
-          axisBorder: {
-            show: false,
-          },
-          axisTicks: {
-            show: false,
-          },
-          title: {
-            text: 'Risk-Reward Ratio',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-        },
-        yaxis: {
-          axisBorder: {
-            show: false,
-          },
-          axisTicks: {
-            show: false,
-          },
-          labels: {
-            show: true,
-            formatter: function(val: number) {
-              return val.toFixed(0) + '%';
-            },
-          },
-          title: {
-            text: 'Kelly Percentage',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-        },
-        title: {
-          text: 'Optimal Bet Size (Kelly Criterion)',
-          floating: false,
-          offsetY: 0,
-          align: 'center',
-          style: {
-            fontFamily: 'inherit',
-          },
-        },
-        theme: {
-          mode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-        },
-      },
-    };
+  const renderChart = () => {
+    // Placeholder for chart rendering
+    return <p>Risk/Reward Chart Placeholder</p>;
   };
-
-  // Generate data for the risk-reward simulator
-  const generateSimulatorData = () => {
-    // Create data for 100 simulated trades
-    const trades = [];
-    const equity = [tradeAmount * 10]; // Start with 10x the trade amount
-    
-    for (let i = 0; i < 100; i++) {
-      const isWin = Math.random() * 100 < winRate;
-      const tradeResult = isWin ? tradeAmount * riskRewardRatio : -tradeAmount;
-      trades.push(tradeResult);
-      
-      const newEquity = equity[equity.length - 1] + tradeResult;
-      equity.push(newEquity);
-    }
-    
-    return {
-      series: [{
-        name: 'Account Equity',
-        data: equity,
-      }],
-      options: {
-        chart: {
-          type: 'line',
-          height: 350,
-          toolbar: {
-            show: true,
-          },
-          background: 'transparent',
-        },
-        colors: ['#8D5EB7'],
-        stroke: {
-          curve: 'stepline',
-          width: 2,
-        },
-        dataLabels: {
-          enabled: false,
-        },
-        markers: {
-          size: 0,
-        },
-        xaxis: {
-          categories: Array.from({ length: equity.length }, (_, i) => i),
-          title: {
-            text: 'Trade Number',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-        },
-        yaxis: {
-          title: {
-            text: 'Account Equity',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-          labels: {
-            formatter: function(value: number) {
-              return formatCurrency(value);
-            },
-          },
-        },
-        tooltip: {
-          shared: false,
-          intersect: true,
-          y: {
-            formatter: function(value: number) {
-              return formatCurrency(value);
-            },
-          },
-        },
-        title: {
-          text: 'Monte Carlo Simulation (100 Trades)',
-          align: 'center',
-          style: {
-            fontFamily: 'inherit',
-          },
-        },
-        theme: {
-          mode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-        },
-      },
-    };
-  };
-
-  const expectedValueData = generateExpectedValueData();
-  const kellyData = generateKellyData();
-  const simulatorData = generateSimulatorData();
 
   return (
     <div className="space-y-6">
@@ -563,18 +299,7 @@ const RiskRewardVisualizer: React.FC<RiskRewardVisualizerProps> = ({
           <Card>
             <CardContent className="pt-6">
               <div className="h-[400px] w-full">
-                <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                  <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-                </div>}>
-                  {typeof window !== 'undefined' && (
-                    <ReactApexChart
-                      options={expectedValueData.options}
-                      series={expectedValueData.series}
-                      type="line"
-                      height={350}
-                    />
-                  )}
-                </Suspense>
+                {renderChart()}
               </div>
               <div className="mt-4 p-3 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/30 rounded-md">
                 <div className="text-sm text-blue-800 dark:text-blue-400">
@@ -593,18 +318,7 @@ const RiskRewardVisualizer: React.FC<RiskRewardVisualizerProps> = ({
           <Card>
             <CardContent className="pt-6">
               <div className="h-[400px] w-full">
-                <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                  <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-                </div>}>
-                  {typeof window !== 'undefined' && (
-                    <ReactApexChart
-                      options={kellyData.options}
-                      series={kellyData.series}
-                      type="bar"
-                      height={350}
-                    />
-                  )}
-                </Suspense>
+                {renderChart()}
               </div>
               <div className="mt-4 p-3 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/30 rounded-md">
                 <div className="text-sm text-blue-800 dark:text-blue-400">
@@ -623,18 +337,7 @@ const RiskRewardVisualizer: React.FC<RiskRewardVisualizerProps> = ({
           <Card>
             <CardContent className="pt-6">
               <div className="h-[400px] w-full">
-                <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                  <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-                </div>}>
-                  {typeof window !== 'undefined' && (
-                    <ReactApexChart
-                      options={simulatorData.options}
-                      series={simulatorData.series}
-                      type="line"
-                      height={350}
-                    />
-                  )}
-                </Suspense>
+                {renderChart()}
               </div>
               <div className="mt-4 p-3 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/30 rounded-md">
                 <div className="text-sm text-blue-800 dark:text-blue-400">

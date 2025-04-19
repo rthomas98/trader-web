@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import ReactApexChart from 'react-apexcharts';
-import { ApexOptions } from 'apexcharts';
 import LoadingSpinner from '../ui/loading-spinner';
 import ErrorMessage from '../ui/error-message';
 import type { CurrencyPair } from '../../types/currency-pair';
@@ -166,7 +164,7 @@ const TradingChart: React.FC<TradingChartProps> = ({
     }, [pairSymbol, timeframe, historicalDataFn, currencyPair?.symbol]);
 
     // Memoize chart options to prevent unnecessary re-renders
-    const chartOptions = useMemo<ApexOptions>(() => {
+    const chartOptions = useMemo<any>(() => {
         return {
             chart: {
                 type: 'candlestick',
@@ -318,14 +316,9 @@ const TradingChart: React.FC<TradingChartProps> = ({
                 </div>
             ) : (
                 <div className="chart-candlestick overflow-hidden pb-5">
-                    <ReactApexChart
-                        key={`${pairSymbol}-${timeframe}`}
-                        options={chartOptions}
-                        series={allSeries}
-                        type="candlestick"
-                        height={400}
-                        width="100%"
-                    />
+                    <div className="h-[400px] flex items-center justify-center border rounded-md">
+                        <p className="text-muted-foreground">Trading chart placeholder for {pairSymbol}.</p>
+                    </div>
                 </div>
             )}
         </div>

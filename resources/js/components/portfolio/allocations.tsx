@@ -1,6 +1,5 @@
 import React from 'react';
-import { AllocationItem } from '@/types/allocation-item';
-import Chart from 'react-apexcharts'; // Direct import
+// import Chart from 'react-apexcharts'; // Direct import
 
 interface AllocationsProps {
     allocations: AllocationItem[];
@@ -12,59 +11,24 @@ const Allocations: React.FC<AllocationsProps> = ({ allocations }) => {
     }
 
     // Prepare data for ApexCharts
-    const series = allocations.map(item => item.percentage);
-    const labels = allocations.map(item => `${item.symbol} (${item.count})`); // Include count in label
+    // const series = allocations.map(item => item.percentage);
+    // const labels = allocations.map(item => `${item.symbol} (${item.count})`); // Include count in label
 
-    const options: ApexCharts.ApexOptions = {
-        chart: {
-            type: 'donut',
-        },
-        labels: labels,
-        plotOptions: {
-            pie: {
-                donut: {
-                    labels: {
-                        show: true,
-                        total: {
-                            show: true,
-                            label: 'Total Pos.', // Label for the total count
-                            formatter: function () { // Remove unused parameter
-                                // Calculate total count from the input data
-                                const totalCount = allocations.reduce((sum, item) => sum + item.count, 0);
-                                return totalCount.toString(); // Display the total count
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        dataLabels: {
-            enabled: true,
-            formatter: function (val: number) {
-                return val.toFixed(1) + '%'; // Show percentage on slices
-            },
-        },
-        legend: {
-            position: 'bottom',
-        },
-        responsive: [{
-            breakpoint: 480,
-            options: {
-                chart: {
-                    width: '100%'
-                },
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }]
-        // Add other styling/options as needed, potentially using brand colors
-        // colors: ['#8D5EB7', '#211DE49', '#EECEE6', '#D04014', ...] // Example using brand colors
-    };
+    // const options: any = { ... }; // Chart options commented out, ApexCharts type removed
 
     return (
         <div className="chart-container p-2">
-            <Chart options={options} series={series} type="donut" width="100%" height={300} />
+            {/* <Chart options={options} series={series} type="donut" width="100%" height={300} /> */}
+            <p className="text-muted-foreground">Allocation chart placeholder.</p>
+            {/* Display allocation list as fallback or alternative */}
+            <ul className="mt-4 space-y-2">
+                {allocations.map((alloc) => (
+                    <li key={alloc.symbol} className="flex justify-between">
+                        <span>{alloc.symbol}</span>
+                        <span>{alloc.percentage.toFixed(1)}%</span>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 };

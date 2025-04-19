@@ -4,10 +4,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Info, TrendingDown, BarChart3, TrendingUp } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-// Import ApexCharts with a lazy-loading approach for client-side only
-import { lazy, Suspense } from 'react';
-const ReactApexChart = lazy(() => import('react-apexcharts'));
-
 interface RiskMetricsProps {
   riskMetrics: {
     maxDrawdown: {
@@ -59,341 +55,6 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ riskMetrics }) => {
     return date.toLocaleDateString();
   };
 
-  // Generate data for the drawdown chart
-  const generateDrawdownChartData = () => {
-    // Create sample drawdown data
-    const dates = [];
-    const drawdownValues = [];
-    
-    if (riskMetrics.maxDrawdown.startDate && riskMetrics.maxDrawdown.endDate) {
-      const startDate = new Date(riskMetrics.maxDrawdown.startDate);
-      const endDate = new Date(riskMetrics.maxDrawdown.endDate);
-      const recoveryDate = riskMetrics.maxDrawdown.recoveryDate 
-        ? new Date(riskMetrics.maxDrawdown.recoveryDate)
-        : new Date(endDate.getTime() + 86400000 * 30); // Add 30 days if no recovery
-      
-      // Generate dates between start and recovery
-      let currentDate = new Date(startDate);
-      while (currentDate <= recoveryDate) {
-        dates.push(currentDate.toISOString().split('T')[0]);
-        currentDate = new Date(currentDate.getTime() + 86400000); // Add 1 day
-      }
-      
-      // Generate drawdown values
-      const maxDrawdownValue = riskMetrics.maxDrawdown.value;
-      const drawdownDuration = Math.max(1, (endDate.getTime() - startDate.getTime()) / 86400000);
-      const recoveryDuration = Math.max(1, (recoveryDate.getTime() - endDate.getTime()) / 86400000);
-      
-      dates.forEach((date) => {
-        const dateObj = new Date(date);
-        if (dateObj < endDate) {
-          // Drawdown phase - linear decline to max drawdown
-          const daysFromStart = (dateObj.getTime() - startDate.getTime()) / 86400000;
-          const drawdownPercentage = (daysFromStart / drawdownDuration) * 100;
-          drawdownValues.push(-(maxDrawdownValue * drawdownPercentage / 100));
-        } else {
-          // Recovery phase - linear recovery
-          const daysFromBottom = (dateObj.getTime() - endDate.getTime()) / 86400000;
-          const recoveryPercentage = (daysFromBottom / recoveryDuration) * 100;
-          drawdownValues.push(-(maxDrawdownValue * (1 - Math.min(1, recoveryPercentage / 100))));
-        }
-      });
-    } else {
-      // If no real drawdown data, create sample data
-      for (let i = 0; i < 30; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - 30 + i);
-        dates.push(date.toISOString().split('T')[0]);
-        
-        // Create a sample drawdown curve
-        if (i < 10) {
-          drawdownValues.push(-(i * 50)); // Decline phase
-        } else if (i < 20) {
-          drawdownValues.push(-500 + ((i - 10) * 25)); // Recovery phase 1
-        } else {
-          drawdownValues.push(-250 + ((i - 20) * 25)); // Recovery phase 2
-        }
-      }
-    }
-    
-    return {
-      series: [{
-        name: 'Drawdown',
-        data: drawdownValues,
-      }],
-      options: {
-        chart: {
-          type: 'area',
-          height: 350,
-          toolbar: {
-            show: true,
-          },
-          background: 'transparent',
-        },
-        dataLabels: {
-          enabled: false,
-        },
-        stroke: {
-          curve: 'smooth',
-          width: 2,
-        },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shadeIntensity: 1,
-            opacityFrom: 0.7,
-            opacityTo: 0.3,
-            stops: [0, 90, 100],
-            colorStops: [
-              {
-                offset: 0,
-                color: '#D04014',
-                opacity: 0.4
-              },
-              {
-                offset: 100,
-                color: '#8D5EB7',
-                opacity: 0.2
-              },
-            ]
-          },
-        },
-        colors: ['#D04014'],
-        xaxis: {
-          categories: dates,
-          type: 'datetime',
-          labels: {
-            formatter: function(value: string) {
-              return new Date(value).toLocaleDateString();
-            },
-          },
-          title: {
-            text: 'Date',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-        },
-        yaxis: {
-          title: {
-            text: 'Drawdown Amount',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-          labels: {
-            formatter: function(value: number) {
-              return formatCurrency(Math.abs(value));
-            },
-          },
-        },
-        tooltip: {
-          shared: false,
-          intersect: true,
-          y: {
-            formatter: function(value: number) {
-              return formatCurrency(Math.abs(value));
-            },
-          },
-        },
-        title: {
-          text: 'Maximum Drawdown Analysis',
-          align: 'center',
-          style: {
-            fontFamily: 'inherit',
-          },
-        },
-        theme: {
-          mode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-        },
-      },
-    };
-  };
-
-  // Generate data for the VaR chart
-  const generateVaRChartData = () => {
-    const varValues = [
-      riskMetrics.valueAtRisk.daily95,
-      riskMetrics.valueAtRisk.daily99,
-      riskMetrics.valueAtRisk.weekly95,
-    ];
-    
-    return {
-      series: [{
-        name: 'Value at Risk',
-        data: varValues,
-      }],
-      options: {
-        chart: {
-          type: 'bar',
-          height: 350,
-          toolbar: {
-            show: false,
-          },
-          background: 'transparent',
-        },
-        plotOptions: {
-          bar: {
-            borderRadius: 4,
-            horizontal: true,
-            dataLabels: {
-              position: 'top',
-            },
-          },
-        },
-        colors: ['#8D5EB7'],
-        dataLabels: {
-          enabled: true,
-          formatter: function(val: number) {
-            return formatCurrency(val);
-          },
-          offsetX: 30,
-          style: {
-            fontSize: '12px',
-            colors: ['#304758'],
-          },
-        },
-        xaxis: {
-          categories: ['Daily (95% CI)', 'Daily (99% CI)', 'Weekly (95% CI)'],
-          title: {
-            text: 'Value at Risk',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-          labels: {
-            formatter: function(value: string) {
-              return formatCurrency(Number(value));
-            },
-          },
-        },
-        yaxis: {
-          title: {
-            text: 'Time Period',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-        },
-        title: {
-          text: 'Value at Risk (VaR)',
-          align: 'center',
-          style: {
-            fontFamily: 'inherit',
-          },
-        },
-        tooltip: {
-          shared: false,
-          intersect: true,
-          y: {
-            formatter: function(value: number) {
-              return formatCurrency(value);
-            },
-          },
-        },
-        theme: {
-          mode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-        },
-      },
-    };
-  };
-
-  // Generate data for the ratios chart
-  const generateRatiosChartData = () => {
-    return {
-      series: [{
-        name: 'Ratio Value',
-        data: [riskMetrics.sharpeRatio, riskMetrics.sortinoRatio],
-      }],
-      options: {
-        chart: {
-          type: 'bar',
-          height: 350,
-          toolbar: {
-            show: false,
-          },
-          background: 'transparent',
-        },
-        plotOptions: {
-          bar: {
-            borderRadius: 4,
-            columnWidth: '50%',
-            dataLabels: {
-              position: 'top',
-            },
-            colors: {
-              ranges: [
-                {
-                  from: -10,
-                  to: 0,
-                  color: '#D04014',
-                },
-                {
-                  from: 0,
-                  to: 1,
-                  color: '#EECEE6',
-                },
-                {
-                  from: 1,
-                  to: 10,
-                  color: '#8D5EB7',
-                },
-              ],
-            },
-          },
-        },
-        dataLabels: {
-          enabled: true,
-          formatter: function(val: number) {
-            return val.toFixed(2);
-          },
-          offsetY: -20,
-          style: {
-            fontSize: '12px',
-            colors: ['#304758'],
-          },
-        },
-        xaxis: {
-          categories: ['Sharpe Ratio', 'Sortino Ratio'],
-          position: 'bottom',
-          title: {
-            text: 'Risk-Adjusted Return Metrics',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-        },
-        yaxis: {
-          title: {
-            text: 'Ratio Value',
-            style: {
-              fontFamily: 'inherit',
-            },
-          },
-          labels: {
-            formatter: function(val: number) {
-              return val.toFixed(2);
-            },
-          },
-        },
-        title: {
-          text: 'Risk-Adjusted Return Ratios',
-          align: 'center',
-          style: {
-            fontFamily: 'inherit',
-          },
-        },
-        theme: {
-          mode: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-        },
-      },
-    };
-  };
-
-  const drawdownChartData = generateDrawdownChartData();
-  const varChartData = generateVaRChartData();
-  const ratiosChartData = generateRatiosChartData();
-
   // Get rating for Sharpe ratio
   const getSharpeRating = (value: number) => {
     if (value >= 3) return { text: 'Excellent', color: 'text-green-500' };
@@ -424,6 +85,21 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ riskMetrics }) => {
   const sharpeRating = getSharpeRating(riskMetrics.sharpeRatio);
   const sortinoRating = getSortinoRating(riskMetrics.sortinoRatio);
   const drawdownRating = getDrawdownRating(riskMetrics.maxDrawdown.percentage);
+
+  const renderDrawdownChart = () => {
+    // Placeholder for chart rendering
+    return <p>Drawdown Chart Placeholder</p>;
+  };
+
+  const renderVaRChart = () => {
+    // Placeholder for chart rendering
+    return <p>VaR Chart Placeholder</p>;
+  };
+
+  const renderRatiosChart = () => {
+    // Placeholder for chart rendering
+    return <p>Ratios Chart Placeholder</p>;
+  };
 
   return (
     <div className="space-y-6">
@@ -583,18 +259,7 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ riskMetrics }) => {
           <Card>
             <CardContent className="pt-6">
               <div className="h-[400px] w-full">
-                <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                  <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-                </div>}>
-                  {typeof window !== 'undefined' && (
-                    <ReactApexChart
-                      options={drawdownChartData.options}
-                      series={drawdownChartData.series}
-                      type="area"
-                      height={350}
-                    />
-                  )}
-                </Suspense>
+                {renderDrawdownChart()}
               </div>
               <div className="mt-4 p-3 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/30 rounded-md">
                 <div className="text-sm text-blue-800 dark:text-blue-400">
@@ -612,18 +277,7 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ riskMetrics }) => {
           <Card>
             <CardContent className="pt-6">
               <div className="h-[400px] w-full">
-                <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                  <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-                </div>}>
-                  {typeof window !== 'undefined' && (
-                    <ReactApexChart
-                      options={varChartData.options}
-                      series={varChartData.series}
-                      type="bar"
-                      height={350}
-                    />
-                  )}
-                </Suspense>
+                {renderVaRChart()}
               </div>
               <div className="mt-4 p-3 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/30 rounded-md">
                 <div className="text-sm text-blue-800 dark:text-blue-400">
@@ -641,18 +295,7 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ riskMetrics }) => {
           <Card>
             <CardContent className="pt-6">
               <div className="h-[400px] w-full">
-                <Suspense fallback={<div className="flex items-center justify-center h-[400px] w-full">
-                  <div className="animate-pulse text-muted-foreground">Loading chart...</div>
-                </div>}>
-                  {typeof window !== 'undefined' && (
-                    <ReactApexChart
-                      options={ratiosChartData.options}
-                      series={ratiosChartData.series}
-                      type="bar"
-                      height={350}
-                    />
-                  )}
-                </Suspense>
+                {renderRatiosChart()}
               </div>
               <div className="mt-4 p-3 border border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-900/30 rounded-md">
                 <div className="text-sm text-blue-800 dark:text-blue-400">
