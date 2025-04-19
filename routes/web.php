@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\ConnectedAccountController;
 use App\Http\Controllers\CopyTradingController;
 use App\Http\Controllers\DashboardController;
@@ -23,9 +24,9 @@ use App\Http\Middleware\EnsureOnboardingComplete;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('welcome');
-})->name('home');
+Route::get('/', [AuthenticatedSessionController::class, 'create'])
+    ->middleware('guest')
+    ->name('home');
 
 // Onboarding routes - accessible to authenticated users without requiring onboarding completion
 Route::middleware(['auth', 'verified'])->group(function () {
