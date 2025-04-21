@@ -1,8 +1,11 @@
 import React from 'react';
+import Chart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Info, TrendingDown, BarChart3, TrendingUp } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useTheme } from '@/components/theme-provider';
 
 interface RiskMetricsProps {
   riskMetrics: {
@@ -21,10 +24,13 @@ interface RiskMetricsProps {
       daily99: number;
       weekly95: number;
     };
+    drawdownHistory?: { date: string; percentage: number }[];
   };
 }
 
 const RiskMetrics: React.FC<RiskMetricsProps> = ({ riskMetrics }) => {
+  const { theme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [activeTab, setActiveTab] = React.useState('drawdown');
 
   // Format currency
@@ -87,18 +93,306 @@ const RiskMetrics: React.FC<RiskMetricsProps> = ({ riskMetrics }) => {
   const drawdownRating = getDrawdownRating(riskMetrics.maxDrawdown.percentage);
 
   const renderDrawdownChart = () => {
-    // Placeholder for chart rendering
-    return <p>Drawdown Chart Placeholder</p>;
+    if (!riskMetrics.drawdownHistory || riskMetrics.drawdownHistory.length === 0) {
+      return <p className="text-center text-muted-foreground h-full flex items-center justify-center">No drawdown history data available.</p>;
+    }
+
+    const series = [{
+      name: 'Drawdown',
+      data: riskMetrics.drawdownHistory.map(item => ({ 
+        x: new Date(item.date).getTime(), 
+        y: item.percentage 
+      }))
+    }];
+
+    const options: ApexOptions = {
+      chart: {
+        type: 'area',
+        height: 350,
+        background: 'transparent',
+        toolbar: {
+          show: true,
+          tools: { download: false, selection: true, zoom: true, zoomin: true, zoomout: true, pan: true, reset: true },
+        },
+         animations: {
+             enabled: false
+         },
+         zoom: {
+             enabled: true
+         }
+      },
+      theme: {
+        mode: isDarkMode ? 'dark' : 'light',
+      },
+      dataLabels: {
+        enabled: false
+      },
+      stroke: {
+        curve: 'smooth',
+        width: 2,
+        colors: ['#D04014'] 
+      },
+      fill: { 
+        type: 'gradient',
+        colors: ['#D04014'],
+        gradient: {
+          shadeIntensity: 1,
+          opacityFrom: 0.6,
+          opacityTo: 0.1,
+          stops: [0, 90, 100]
+        }
+      },
+      xaxis: {
+        type: 'datetime',
+        labels: {
+          style: {
+              colors: isDarkMode ? '#E1E1E6' : '#333333'
+          }
+        },
+         tooltip: {
+             enabled: true
+         }
+      },
+      yaxis: {
+        labels: {
+          formatter: function (value) {
+            return `${value.toFixed(1)}%`; 
+          },
+          style: {
+              colors: isDarkMode ? '#E1E1E6' : '#333333'
+          }
+        },
+        min: 0, 
+        title: {
+             text: 'Drawdown Percentage',
+             style: {
+                 color: isDarkMode ? '#E1E1E6' : '#333333',
+                 fontWeight: 400,
+             }
+        }
+      },
+      tooltip: {
+        theme: isDarkMode ? 'dark' : 'light',
+        x: {
+          format: 'dd MMM yyyy'
+        },
+        y: {
+          formatter: function (value) {
+            return `${value.toFixed(2)}%`;
+          },
+          title: {
+            formatter: () => 'Drawdown:'
+          }
+        }
+      },
+      grid: {
+        borderColor: isDarkMode ? '#333' : '#e0e0e0',
+        strokeDashArray: 4,
+      },
+      title: {
+        text: 'Drawdown Over Time',
+        align: 'left',
+         style: {
+             color: isDarkMode ? '#F9F9F9' : '#1A161D',
+         }
+      }
+    };
+
+    return <Chart options={options} series={series} type="area" height={350} />;
   };
 
   const renderVaRChart = () => {
-    // Placeholder for chart rendering
-    return <p>VaR Chart Placeholder</p>;
+    // Check if VaR data exists
+    if (!riskMetrics.valueAtRisk) {
+       return <p className="text-center text-muted-foreground h-full flex items-center justify-center">Value at Risk data not available.</p>;
+    }
+
+    const { daily95, daily99, weekly95 } = riskMetrics.valueAtRisk;
+
+    // Prepare data for ApexCharts Bar chart
+    const series = [{
+      name: 'VaR Amount',
+      data: [daily95, daily99, weekly95]
+    }];
+
+    const options: ApexOptions = {
+      chart: {
+        type: 'bar',
+        height: 350,
+        background: 'transparent',
+        toolbar: {
+          show: false
+        }
+      },
+      theme: {
+        mode: isDarkMode ? 'dark' : 'light',
+      },
+      plotOptions: {
+        bar: {
+          horizontal: false,
+          columnWidth: '55%',
+          borderRadius: 5, // Use borderRadius instead
+          distributed: false, // Use single color for all bars
+        },
+      },
+      dataLabels: {
+        enabled: false, // Keep bars clean, tooltip shows value
+      },
+       colors: ['#8D5EB7'], // Use primary brand color for VaR bars
+      stroke: {
+        show: true,
+        width: 2,
+        colors: ['transparent']
+      },
+      xaxis: {
+        categories: ['Daily 95%', 'Daily 99%', 'Weekly 95%'],
+        labels: {
+          style: {
+              colors: isDarkMode ? '#E1E1E6' : '#333333'
+          }
+        }
+      },
+      yaxis: {
+        title: {
+          text: 'Potential Loss Amount (USD)',
+           style: {
+                 color: isDarkMode ? '#E1E1E6' : '#333333',
+                 fontWeight: 400,
+           }
+        },
+        labels: {
+          formatter: function (value) {
+             return formatCurrency(value); // Use existing currency formatter
+          },
+          style: {
+              colors: isDarkMode ? '#E1E1E6' : '#333333'
+          }
+        }
+      },
+      fill: {
+        opacity: 1
+      },
+      tooltip: {
+        theme: isDarkMode ? 'dark' : 'light',
+        y: {
+          formatter: function (val) {
+            return formatCurrency(val) + " maximum potential loss";
+          },
+          title: {
+             formatter: (seriesName, opts) => {
+                 const category = opts.w.globals.labels[opts.dataPointIndex];
+                 return `${category} VaR:`;
+             }
+          }
+        }
+      },
+       grid: {
+        borderColor: isDarkMode ? '#333' : '#e0e0e0',
+        strokeDashArray: 4,
+      },
+      title: {
+        text: 'Value at Risk (VaR) Comparison',
+        align: 'left',
+        style: {
+             color: isDarkMode ? '#F9F9F9' : '#1A161D',
+         }
+      }
+    };
+
+    return <Chart options={options} series={series} type="bar" height={350} />;
   };
 
   const renderRatiosChart = () => {
-    // Placeholder for chart rendering
-    return <p>Ratios Chart Placeholder</p>;
+    // Check if ratio data exists
+    if (riskMetrics.sharpeRatio === undefined || riskMetrics.sortinoRatio === undefined) {
+       return <p className="text-center text-muted-foreground h-full flex items-center justify-center">Ratio data not available.</p>;
+    }
+    
+    const series = [{
+        name: 'Ratio Value',
+        data: [riskMetrics.sharpeRatio, riskMetrics.sortinoRatio]
+    }];
+
+    const options: ApexOptions = {
+        chart: {
+            type: 'bar',
+            height: 350,
+            background: 'transparent',
+            toolbar: {
+                show: false
+            }
+        },
+        theme: {
+            mode: isDarkMode ? 'dark' : 'light',
+        },
+        plotOptions: {
+            bar: {
+                horizontal: false,
+                columnWidth: '45%',
+                distributed: true, // Use different colors for each bar
+                borderRadius: 5,
+            },
+        },
+         colors: ['#8D5EB7', '#EECEE6'], // Sharpe (Purple), Sortino (Pink-ish)
+        dataLabels: {
+            enabled: false,
+        },
+        xaxis: {
+            categories: ['Sharpe Ratio', 'Sortino Ratio'],
+            labels: {
+                style: {
+                    colors: isDarkMode ? '#E1E1E6' : '#333333',
+                    fontWeight: 600,
+                }
+            }
+        },
+        yaxis: {
+            title: {
+                text: 'Ratio Value',
+                 style: {
+                     color: isDarkMode ? '#E1E1E6' : '#333333',
+                     fontWeight: 400,
+                }
+            },
+            labels: {
+                formatter: function (value) {
+                    return value.toFixed(2); // Format ratio to 2 decimal places
+                },
+                style: {
+                    colors: isDarkMode ? '#E1E1E6' : '#333333'
+                }
+            }
+        },
+        tooltip: {
+            theme: isDarkMode ? 'dark' : 'light',
+            y: {
+                formatter: function (val) {
+                    return val.toFixed(3); // Show more precision in tooltip
+                },
+                 title: {
+                    formatter: (seriesName, opts) => {
+                        return opts.w.globals.labels[opts.dataPointIndex] + ':';
+                    }
+                }
+            }
+        },
+        legend: {
+            show: false // Colors are tied to categories directly
+        },
+        grid: {
+            borderColor: isDarkMode ? '#333' : '#e0e0e0',
+            strokeDashArray: 4,
+        },
+        title: {
+            text: 'Risk-Adjusted Return Ratios',
+            align: 'left',
+            style: {
+                color: isDarkMode ? '#F9F9F9' : '#1A161D',
+            }
+        }
+    };
+
+    return <Chart options={options} series={series} type="bar" height={350} />;
   };
 
   return (

@@ -1,32 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import LoadingSpinner from '../ui/loading-spinner';
-import ErrorMessage from '../ui/error-message';
-import type { CurrencyPair } from '../../types/currency-pair';
-import type { RawDataPoint } from '../../types/market-data';
+import React, { useState, useEffect } from 'react';
+import Chart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
+import LoadingSpinner from '@/components/ui/loading-spinner';
+import ErrorMessage from '@/components/ui/error-message';
+import type { RawDataPoint } from '@/types/market-data';
 
 // Define local types
 interface CandleData {
-    x: Date;
-    y: [number, number, number, number]; // [open, high, low, close]
-}
-
-interface PredictionPoint {
-    x: Date;
-    y: number;
-}
-
-interface PredictionSeriesData {
-    name: string;
-    type: 'line';
-    data: PredictionPoint[];
-    color?: string;
-    dashArray?: number;
+    x: Date;            // Timestamp
+    y: number[];        // [open, high, low, close]
 }
 
 interface TradingChartProps {
     pairSymbol: string;
     timeframe: string;
-    currencyPair?: CurrencyPair;
     historicalDataFn: (pairSymbol: string, timeframe: string, count?: number) => Promise<CandleData[] | RawDataPoint[]>;
     predictiveMode?: boolean;
 }
@@ -34,292 +21,258 @@ interface TradingChartProps {
 const TradingChart: React.FC<TradingChartProps> = ({
     pairSymbol,
     timeframe,
-    currencyPair,
     historicalDataFn,
     predictiveMode = false,
 }) => {
-    // Dark mode state (simplified for now)
-    const isDarkMode = document.documentElement.classList.contains('dark');
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [candleData, setCandleData] = useState<CandleData[]>([]);
-    const [predictionSeriesData, setPredictionSeriesData] = useState<PredictionSeriesData[]>([]);
-    
-    // Default to 5 decimal places for most currency pairs
-    const pipDigits = useMemo(() => {
-        const symbol = currencyPair?.symbol || pairSymbol || '';
-        return symbol.toUpperCase().includes('JPY') ? 3 : 5;
-    }, [currencyPair, pairSymbol]);
+    const [series, setSeries] = useState<ApexAxisChartSeries>([]);
+    const [options, setOptions] = useState<ApexOptions>({});
 
-    const predictionSeries = useMemo(() => {
-        if (!predictiveMode || !candleData || candleData.length === 0) {
-            return [];
-        }
-        const lastDataPoint = candleData[candleData.length - 1];
-        const predictions: PredictionPoint[] = [];
-        let lastTimestamp = new Date(lastDataPoint.x).getTime();
-        let lastClose = lastDataPoint.y[3];
-
-        for (let i = 1; i <= 10; i++) {
-            lastTimestamp += 60 * 60 * 1000;
-            lastClose = lastClose * (1 + (Math.random() - 0.5) * 0.01);
-            predictions.push({
-                x: new Date(lastTimestamp),
-                y: lastClose
-            });
-        }
-
-        return [{
-            name: 'Prediction',
-            type: 'line' as const,
-            data: predictions,
-            color: '#ADFF2F',
-            dashArray: 5
-        }];
-    }, [predictiveMode, candleData]);
+    // Detect dark mode
+    const isDarkMode = document.documentElement.classList.contains('dark');
 
     useEffect(() => {
-        setPredictionSeriesData(predictionSeries);
-    }, [predictionSeries]);
-
-    useEffect(() => {
-        console.log('[TradingChart] useEffect triggered. Props:', { 
-            pairSymbol, 
-            timeframe, 
-            currencyPairName: currencyPair?.symbol, 
-            hasHistoricalDataFn: !!historicalDataFn 
-        });
-        
-        // Reset error state
         setError(null);
-        
-        // Validate props
         if (!pairSymbol || !timeframe || !historicalDataFn) {
             console.log('[TradingChart] Invalid props, staying in loading state');
             return;
         }
-        
-        // Set loading state
+
         setIsLoading(true);
-        
-        const fetchData = async () => {
+
+        const fetchDataAndSetupChart = async () => {
             try {
-                const rawData = await historicalDataFn(pairSymbol, timeframe);
-                
+                const rawData = await historicalDataFn(pairSymbol, timeframe, 200); // Request 200 points
+
                 if (!Array.isArray(rawData) || rawData.length === 0) {
                     setError('No data available for the selected pair and timeframe');
                     setIsLoading(false);
                     return;
                 }
-                
-                // Limit to the most recent 200 data points for performance
-                const limitedData = rawData.slice(-200);
-                
-                console.log(`Processing ${limitedData.length} out of ${rawData.length} data points for better performance`);
-                
-                // Transform data for ApexCharts if needed
-                let transformedData: CandleData[];
-                
-                // Check if the data is already in CandleData format
-                if ('x' in limitedData[0] && 'y' in limitedData[0]) {
-                    transformedData = limitedData as CandleData[];
+
+                let transformedData: CandleData[] = [];
+                if ('timestamp' in rawData[0] && 'open' in rawData[0]) {
+                    transformedData = (rawData as RawDataPoint[]).map(point => ({
+                        x: new Date(point.timestamp),
+                        y: [
+                            Number(point.open),
+                            Number(point.high),
+                            Number(point.low),
+                            Number(point.close),
+                        ],
+                    }));
                 } else {
-                    // Convert from RawDataPoint format
-                    transformedData = (limitedData as RawDataPoint[])
-                        .map((point): CandleData | null => {
-                            if (
-                                point &&
-                                typeof point.timestamp !== 'undefined' &&
-                                typeof point.open !== 'undefined' &&
-                                typeof point.high !== 'undefined' &&
-                                typeof point.low !== 'undefined' &&
-                                typeof point.close !== 'undefined'
-                            ) {
-                                return {
-                                    x: new Date(point.timestamp),
-                                    y: [point.open, point.high, point.low, point.close]
-                                };
-                            }
-                            return null;
-                        })
-                        .filter((item): item is CandleData => item !== null);
+                    transformedData = rawData as CandleData[];
                 }
-                
+
                 if (transformedData.length === 0) {
                     setError('Failed to process chart data');
                     setIsLoading(false);
                     return;
                 }
-                
-                setCandleData(transformedData);
+
+                // Sort data just in case it's not ordered
+                transformedData.sort((a, b) => a.x.getTime() - b.x.getTime());
+
+                const candlestickSeries = {
+                    name: 'Price',
+                    type: 'candlestick',
+                    data: transformedData,
+                };
+
+                const tempSeries: ApexAxisChartSeries = [candlestickSeries]; 
+                const tempPredictionData: { x: Date; y: number }[] = []; 
+
+                // Generate simple prediction data (linear trend based on last 2 points)
+                if (predictiveMode && transformedData.length >= 2) {
+                    const lastPoint = transformedData[transformedData.length - 1];
+                    const secondLastPoint = transformedData[transformedData.length - 2];
+                    const lastClose = lastPoint.y[3];
+                    const secondLastClose = secondLastPoint.y[3];
+                    const timeDiff = lastPoint.x.getTime() - secondLastPoint.x.getTime();
+                    const priceDiff = lastClose - secondLastClose;
+                    const trendPerMs = timeDiff > 0 ? priceDiff / timeDiff : 0;
+
+                    let currentPredictionTime = lastPoint.x.getTime();
+                    let currentPredictionPrice = lastClose;
+
+                    for (let i = 1; i <= 10; i++) {
+                        currentPredictionTime += timeDiff; // Assume same interval
+                        currentPredictionPrice += trendPerMs * timeDiff;
+                        tempPredictionData.push({ 
+                            x: new Date(currentPredictionTime), 
+                            y: currentPredictionPrice 
+                        });
+                    }
+
+                    tempSeries.push({ 
+                        name: 'Prediction',
+                        type: 'line',
+                        data: tempPredictionData, 
+                        color: '#D04014', // Brand color for prediction
+                    });
+                }
+
+                setSeries(tempSeries); 
+
+                // Define Chart Options
+                setOptions({
+                    chart: {
+                        type: 'candlestick',
+                        height: 400,
+                        background: 'transparent', // Use CSS for background
+                        toolbar: {
+                            show: true,
+                            tools: {
+                                download: true,
+                                selection: true,
+                                zoom: true,
+                                zoomin: true,
+                                zoomout: true,
+                                pan: true,
+                                reset: true
+                            },
+                        },
+                        animations: {
+                           enabled: false // Disable animation on data update for smoother feel
+                        }
+                    },
+                    theme: {
+                        mode: isDarkMode ? 'dark' : 'light',
+                    },
+                    title: {
+                        text: `${pairSymbol} (${timeframe})`,
+                        align: 'left',
+                        style: {
+                           color: isDarkMode ? '#F9F9F9' : '#1A161D',
+                        }
+                    },
+                    xaxis: {
+                        type: 'datetime',
+                        labels: {
+                            style: {
+                                colors: isDarkMode ? '#E1E1E6' : '#333333'
+                            }
+                        },
+                        tooltip: {
+                           enabled: true,
+                        }
+                    },
+                    yaxis: {
+                        tooltip: {
+                            enabled: true,
+                        },
+                        labels: {
+                           style: {
+                                colors: isDarkMode ? '#E1E1E6' : '#333333'
+                           },
+                           formatter: function (value) {
+                                return value.toFixed(5); // Forex usually needs precision
+                           }
+                        }
+                    },
+                    tooltip: {
+                        shared: true,
+                        intersect: false, 
+                        theme: isDarkMode ? 'dark' : 'light',
+                        y: {
+                            formatter: function (val, { seriesIndex, dataPointIndex, w }) {
+                                // Type assertion needed as ApexCharts types might be generic
+                                const configSeries = w.config.series as ApexAxisChartSeries; 
+                                const seriesType = configSeries[seriesIndex].type;
+                                const dataPoint = configSeries[seriesIndex].data[dataPointIndex] as CandleData | { x: Date; y: number }; // Type assertion
+
+                                if (seriesType === 'candlestick' && typeof dataPoint === 'object' && dataPoint !== null && 'y' in dataPoint && Array.isArray(dataPoint.y)) {
+                                    const ohlc = dataPoint.y;
+                                    return `O: ${ohlc[0].toFixed(5)} H: ${ohlc[1].toFixed(5)} L: ${ohlc[2].toFixed(5)} C: ${ohlc[3].toFixed(5)}`;
+                                } else if (typeof val === 'number') {
+                                    return val.toFixed(5);
+                                }
+                                return ''; // Fallback for unexpected types
+                            }
+                        },
+                    },
+                    plotOptions: {
+                        candlestick: {
+                            colors: {
+                                upward: '#8D5EB7', // Brand color for upward candles
+                                downward: '#D04014' // Brand color for downward candles (or choose another)
+                            },
+                            wick: {
+                               useFillColor: true,
+                            }
+                        }
+                    },
+                    stroke: {
+                        width: [1, 2], // Candlestick border, Prediction line
+                        curve: 'smooth'
+                    },
+                    markers: {
+                        size: predictiveMode ? [0, 4] : [0], // Only show markers for prediction line
+                        hover: {
+                           sizeOffset: 2
+                        }
+                    },
+                    noData: {
+                        text: 'Loading chart data...',
+                        align: 'center',
+                        verticalAlign: 'middle',
+                        offsetX: 0,
+                        offsetY: 0,
+                        style: {
+                            color: isDarkMode ? '#F9F9F9' : '#1A161D',
+                            fontSize: '14px',
+                        }
+                    }
+                });
+
                 setIsLoading(false);
             } catch (err) {
-                console.error('[TradingChart] Error fetching data:', err);
-                setError('Failed to fetch chart data. Please try again later.');
+                console.error('[TradingChart] Error fetching or processing data:', err);
+                setError('Failed to load chart data. Please try again later.');
                 setIsLoading(false);
             }
         };
-        
-        fetchData();
-    }, [pairSymbol, timeframe, historicalDataFn, currencyPair?.symbol]);
 
-    // Memoize chart options to prevent unnecessary re-renders
-    const chartOptions = useMemo<any>(() => {
-        return {
-            chart: {
-                type: 'candlestick',
-                height: 400,
-                toolbar: {
-                    show: true,
-                    tools: {
-                        download: true,
-                        selection: true,
-                        zoom: true,
-                        zoomin: true,
-                        zoomout: true,
-                        pan: true,
-                        reset: true,
-                    },
-                },
-                animations: {
-                    enabled: false, // Disable animations for better performance
-                },
-                background: 'transparent',
-                parentHeightOffset: 0,
-                offsetY: 0,
-            },
-            theme: {
-                mode: isDarkMode ? 'dark' : 'light',
-            },
-            title: {
-                text: pairSymbol ? `${pairSymbol} (${timeframe})` : `Chart (${timeframe})`,
-                align: 'left',
-            },
-            xaxis: {
-                type: 'datetime',
-                labels: {
-                    datetimeUTC: false,
-                    formatter: function(value) {
-                        // Safely handle the timestamp
-                        return new Date(typeof value === 'number' ? value : 0).toLocaleString();
-                    },
-                    style: {
-                        fontSize: '10px'
-                    },
-                    offsetY: 5
-                },
-                axisBorder: {
-                    show: true
-                },
-                axisTicks: {
-                    show: true
-                }
-            },
-            yaxis: {
-                tooltip: {
-                    enabled: true,
-                },
-                labels: {
-                    formatter: (value) => value.toFixed(pipDigits),
-                },
-            },
-            tooltip: {
-                enabled: true,
-                theme: isDarkMode ? 'dark' : 'light',
-                x: {
-                    format: 'MMM dd HH:mm',
-                },
-            },
-            grid: {
-                borderColor: isDarkMode ? '#4b5563' : '#e5e7eb',
-                padding: {
-                    bottom: 15
-                }
-            },
-            margin: {
-                bottom: 30
-            },
-            plotOptions: {
-                candlestick: {
-                    colors: {
-                        upward: '#10b981', // Green for up candles
-                        downward: '#ef4444', // Red for down candles
-                    },
-                    wick: {
-                        useFillColor: true,
-                    },
-                },
-            },
-            responsive: [
-                {
-                    breakpoint: 1000,
-                    options: {
-                        chart: {
-                            height: 400,
-                        },
-                    },
-                },
-                {
-                    breakpoint: 600,
-                    options: {
-                        chart: {
-                            height: 300,
-                        },
-                    },
-                },
-            ],
-            dataLabels: {
-                enabled: false,
-            },
-            stroke: {
-                curve: 'smooth',
-                width: 2,
-            },
+        fetchDataAndSetupChart();
+
+        // Add resize listener for responsiveness
+        const handleResize = () => {
+           // ApexCharts handles responsiveness automatically based on container size
+           // No specific action needed here unless forcing a redraw, which is usually not necessary
         };
-    }, [pairSymbol, timeframe, isDarkMode, pipDigits]);
 
-    const allSeries = useMemo(() => {
-        const series = [];
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
 
-        if (candleData && candleData.length > 0) {
-            series.push({
-                name: 'Price',
-                type: 'candlestick',
-                data: candleData
-            });
-        }
-
-        if (predictiveMode && predictionSeriesData.length > 0) {
-            series.push(...predictionSeriesData);
-        }
-
-        return series;
-    }, [candleData, predictiveMode, predictionSeriesData]);
+    }, [pairSymbol, timeframe, historicalDataFn, predictiveMode, isDarkMode]); // Re-run if mode changes
 
     return (
-        <div className="w-full h-full p-2 bg-card text-card-foreground rounded-lg">
-            <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold">
-                    {pairSymbol ? `${pairSymbol} (${timeframe})` : 'Loading Chart...'}
-                </h2>
-            </div>
-
+        <div className="w-full bg-card text-card-foreground rounded-lg border shadow-sm p-4">
             {isLoading ? (
-                <LoadingSpinner className="h-[420px] w-full rounded-lg" />
+                <LoadingSpinner className="h-[420px] w-full" />
             ) : error ? (
                 <ErrorMessage className="flex items-center justify-center h-[420px] text-red-500 dark:text-red-400 border border-dashed border-red-300 dark:border-red-700 rounded-lg p-4">
-                    <p>Error loading chart data: {error}</p>
+                    <p>{error}</p>
                 </ErrorMessage>
-            ) : candleData.length === 0 ? (
-                <div className="flex items-center justify-center h-[420px] text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4">
-                    <p>No valid data available for the selected pair and timeframe.</p>
+            ) : series.length > 0 && series[0].data && series[0].data.length > 0 ? (
+                <div id="chart-candlestick" className="chart-candlestick">
+                    {/* Conditional rendering to ensure Chart component mounts only when options/series are ready */}
+                    {options.chart && series.length > 0 && (
+                        <Chart
+                            options={options}
+                            series={series}
+                            type="candlestick"
+                            height={400}
+                            width="100%"
+                        />
+                    )}
                 </div>
             ) : (
-                <div className="chart-candlestick overflow-hidden pb-5">
-                    <div className="h-[400px] flex items-center justify-center border rounded-md">
-                        <p className="text-muted-foreground">Trading chart placeholder for {pairSymbol}.</p>
-                    </div>
-                </div>
+                 <div className="flex items-center justify-center h-[420px] text-muted-foreground border border-dashed border-border rounded-lg p-4">
+                     <p>No valid data available to display the chart.</p>
+                 </div>
             )}
         </div>
     );

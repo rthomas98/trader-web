@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Info, TrendingUp, BarChart2, PieChart } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import Chart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
+import { useTheme } from '@/components/theme-provider';
 
 interface RiskRewardVisualizerProps {
   positionSizing: {
@@ -51,12 +53,13 @@ interface RiskRewardVisualizerProps {
 
 const RiskRewardVisualizer: React.FC<RiskRewardVisualizerProps> = ({
   positionSizing,
-  riskProfile,
 }) => {
   const [activeTab, setActiveTab] = useState('expected-value');
   const [riskRewardRatio, setRiskRewardRatio] = useState(2);
   const [winRate, setWinRate] = useState(positionSizing.riskRewardRatios.winRate || 50);
   const [tradeAmount, setTradeAmount] = useState(1000);
+  const { theme } = useTheme();
+  const isDarkMode = theme === 'dark';
 
   // Format currency
   const formatCurrency = (value: number) => {
@@ -92,14 +95,110 @@ const RiskRewardVisualizer: React.FC<RiskRewardVisualizerProps> = ({
 
   const outcomes = calculateOutcomes();
 
-  // Temporary data structure - replace with actual data source
-  const riskRewardData = [
-    // Add data here
-  ];
+  // Define chart data and options
+  const series = [{
+    name: 'Amount',
+    data: [outcomes.lossAmount, outcomes.winAmount]
+  }];
+
+  const options: ApexOptions = {
+    chart: {
+      type: 'bar',
+      height: 200,
+      background: 'transparent',
+      toolbar: {
+        show: false,
+      },
+    },
+    plotOptions: {
+      bar: {
+        horizontal: true,
+        distributed: true, // Use different colors for each bar
+        barHeight: '50%',
+        dataLabels: {
+          position: 'bottom', // Show labels inside the bar at the bottom
+        },
+      },
+    },
+    colors: ['#D04014', '#8D5EB7'], // Risk (Red-ish), Reward (Purple-ish)
+    dataLabels: {
+      enabled: true,
+      textAnchor: 'start',
+      style: {
+        colors: ['#fff'] // White text for labels inside bars
+      },
+      formatter: function (val) {
+        // Display the actual value ($ amount)
+         return `$${Number(val).toFixed(2)}`; 
+      },
+      offsetX: 0,
+      dropShadow: {
+        enabled: true
+      }
+    },
+    xaxis: {
+      categories: ['Potential Risk', 'Potential Reward'],
+      labels: {
+        show: true, // Show X-axis labels (Risk/Reward Amount)
+        style: {
+          colors: isDarkMode ? '#E1E1E6' : '#333333',
+          fontSize: '10px'
+        },
+         formatter: function (value) {
+          return `$${Number(value).toFixed(2)}`;
+        }
+      },
+       axisBorder: {
+         show: false
+       },
+       axisTicks: {
+         show: false,
+       }
+    },
+    yaxis: {
+      labels: {
+        show: true, // Show Y-axis labels (Risk/Reward Categories)
+         style: {
+          colors: isDarkMode ? '#E1E1E6' : '#333333',
+          fontWeight: 600,
+         }
+      }
+    },
+    grid: {
+      show: false, // Hide grid lines for cleaner look       
+    },
+    tooltip: {
+      theme: isDarkMode ? 'dark' : 'light',
+       y: {
+         formatter: function(value) {
+           return `$${Number(value).toFixed(2)}`;
+         },
+         title: {
+          formatter: function (seriesName, opts) {
+            return opts.w.globals.labels[opts.dataPointIndex] // Show 'Potential Risk' or 'Potential Reward'
+          }
+        }
+      }
+    },
+    legend: {
+      show: false // Hide legend as colors + Y-axis are clear
+    },
+     title: {
+      text: 'Risk vs. Reward',
+      align: 'center',
+      style: {
+        color: isDarkMode ? '#F9F9F9' : '#1A161D',
+      }
+    },
+  };
 
   const renderChart = () => {
-    // Placeholder for chart rendering
-    return <p>Risk/Reward Chart Placeholder</p>;
+    // Simple bar chart to visualize risk vs reward amounts
+    return (
+      <div id="risk-reward-chart">
+         <Chart options={options} series={series} type="bar" height={200} />
+      </div>
+    );
   };
 
   return (
